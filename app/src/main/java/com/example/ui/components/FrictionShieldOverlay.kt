@@ -7,10 +7,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -81,194 +84,354 @@ fun FrictionShieldOverlay(
         onKeepLocked()
     }
 
+    val title = when (challenge.reason) {
+        FrictionReason.QUIT_FOCUS_LOCK_EARLY ->
+            "Stay in ${challenge.targetAppName ?: "your reader"}?"
+        FrictionReason.UNLOCK_BLOCKED_APP ->
+            "${challenge.targetAppName ?: "App"} is blocked for today"
+        FrictionReason.EDIT_LOCKED_APP_SETTINGS ->
+            "Unlock ${challenge.targetAppName ?: "App"} settings"
+    }
+
+    val subtitle = when (challenge.reason) {
+        FrictionReason.QUIT_FOCUS_LOCK_EARLY ->
+            "To prevent subconscious quitting mid-chapter, solve the puzzle only if you truly need to exit."
+        FrictionReason.UNLOCK_BLOCKED_APP ->
+            "You reached your daily limit. Solve the puzzle to grant a 10-minute override."
+        FrictionReason.EDIT_LOCKED_APP_SETTINGS ->
+            "This app has reached its daily limit. Complete the puzzle to modify its timer."
+    }
+
+    val badgeLabel = when (challenge.reason) {
+        FrictionReason.QUIT_FOCUS_LOCK_EARLY -> "Focus Lock Active"
+        FrictionReason.UNLOCK_BLOCKED_APP -> "Daily Limit Reached"
+        FrictionReason.EDIT_LOCKED_APP_SETTINGS -> "Settings Locked"
+    }
+
+    val returnLabel = if (challenge.reason == FrictionReason.QUIT_FOCUS_LOCK_EARLY) {
+        "Keep Reading (${challenge.targetAppName ?: "Locked"})"
+    } else {
+        "Keep App Locked"
+    }
+
     Surface(
         color = MaterialTheme.colorScheme.background,
         modifier = modifier
             .fillMaxSize()
             .testTag("friction_shield_overlay")
     ) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .imePadding()
-                .widthIn(max = 540.dp)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .imePadding(),
+            contentAlignment = Alignment.Center
         ) {
-            // Clean Header Pill
-            Surface(
-                color = MaterialTheme.colorScheme.errorContainer,
-                shape = CircleShape
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = when (challenge.reason) {
-                            FrictionReason.QUIT_FOCUS_LOCK_EARLY -> "Focus Lock Active"
-                            FrictionReason.UNLOCK_BLOCKED_APP -> "Daily Limit Reached"
-                            FrictionReason.EDIT_LOCKED_APP_SETTINGS -> "Settings Locked"
-                        },
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                }
-            }
+            val isTablet = maxWidth >= 700.dp
 
-            // Title & Description
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val title = when (challenge.reason) {
-                    FrictionReason.QUIT_FOCUS_LOCK_EARLY ->
-                        "Stay in ${challenge.targetAppName ?: "your reader"}?"
-                    FrictionReason.UNLOCK_BLOCKED_APP ->
-                        "${challenge.targetAppName ?: "App"} is blocked for today"
-                    FrictionReason.EDIT_LOCKED_APP_SETTINGS ->
-                        "Unlock ${challenge.targetAppName ?: "App"} settings"
-                }
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = Alignment.CenterHorizontally.let { TextAlign.Center }
-                )
-
-                val subtitle = when (challenge.reason) {
-                    FrictionReason.QUIT_FOCUS_LOCK_EARLY ->
-                        "To prevent subconscious quitting mid-chapter, solve the puzzle below only if you truly need to exit."
-                    FrictionReason.UNLOCK_BLOCKED_APP ->
-                        "You reached your daily limit. Solve the puzzle to grant a 10-minute override."
-                    FrictionReason.EDIT_LOCKED_APP_SETTINGS ->
-                        "This app has reached its daily limit. Complete the puzzle below to modify its timer."
-                }
-
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // 3-Mode Segmented Selector (Pattern / Math / Phrase)
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = CircleShape,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            if (isTablet) {
+                // --- TABLET 2-PANE COGNITIVE GATE ---
                 Row(
                     modifier = Modifier
+                        .widthIn(max = 980.dp)
                         .fillMaxWidth()
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        .padding(horizontal = 28.dp, vertical = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    PuzzleModeTab(
-                        label = "Pattern",
-                        icon = Icons.Filled.Apps,
-                        selected = challenge.mode == ChallengeMode.MEMORY_GRID,
-                        onClick = { onSwitchMode(ChallengeMode.MEMORY_GRID) },
+                    // Left Pane: Context & Escape Card
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = RoundedCornerShape(36.dp),
                         modifier = Modifier
-                            .weight(1f)
-                            .testTag("mode_pattern_tab")
-                    )
-                    PuzzleModeTab(
-                        label = "Math",
-                        icon = Icons.Filled.Calculate,
-                        selected = challenge.mode == ChallengeMode.MATH_CHAIN,
-                        onClick = { onSwitchMode(ChallengeMode.MATH_CHAIN) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("mode_math_tab")
-                    )
-                    PuzzleModeTab(
-                        label = "Phrase",
-                        icon = Icons.Filled.Keyboard,
-                        selected = challenge.mode == ChallengeMode.PHRASE,
-                        onClick = { onSwitchMode(ChallengeMode.PHRASE) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("mode_phrase_tab")
-                    )
-                }
-            }
+                            .weight(0.45f)
+                            .fillMaxHeight()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(28.dp),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            horizontalAlignment = Alignment.Start
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    shape = CircleShape
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Lock,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = badgeLabel,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
 
-            // Active Puzzle Container
-            when (challenge.mode) {
-                ChallengeMode.MEMORY_GRID -> {
-                    MemoryGridPuzzleCard(
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.displaySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+
+                                Text(
+                                    text = subtitle,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onKeepLocked()
+                                },
+                                shape = CircleShape,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(64.dp)
+                                    .testTag("keep_locked_return_button")
+                            ) {
+                                Text(
+                                    text = returnLabel,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    // Right Pane: Segmented Switcher & Active Puzzle
+                    Column(
+                        modifier = Modifier
+                            .weight(0.55f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        PuzzleModeSelectorBar(
+                            currentMode = challenge.mode,
+                            onSwitchMode = onSwitchMode
+                        )
+
+                        ActivePuzzleContent(
+                            challenge = challenge,
+                            onTapMemoryTile = { index ->
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onTapMemoryTile(index)
+                            },
+                            onReplayMemoryPattern = onReplayMemoryPattern,
+                            onMathInputChanged = onMathInputChanged,
+                            onSubmitMathStep = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onSubmitMathStep()
+                            },
+                            onPhraseChanged = onPhraseChanged,
+                            onConfirmPhraseUnlock = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onConfirmPhraseUnlock()
+                            }
+                        )
+                    }
+                }
+            } else {
+                // --- PHONE CENTERED SINGLE-COLUMN GATE ---
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 520.dp)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 22.dp, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = CircleShape
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = badgeLabel,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    PuzzleModeSelectorBar(
+                        currentMode = challenge.mode,
+                        onSwitchMode = onSwitchMode
+                    )
+
+                    ActivePuzzleContent(
                         challenge = challenge,
-                        onTapTile = { index ->
+                        onTapMemoryTile = { index ->
                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onTapMemoryTile(index)
                         },
-                        onReplayPattern = onReplayMemoryPattern
-                    )
-                }
-                ChallengeMode.MATH_CHAIN -> {
-                    HardMathPuzzleCard(
-                        challenge = challenge,
+                        onReplayMemoryPattern = onReplayMemoryPattern,
                         onMathInputChanged = onMathInputChanged,
                         onSubmitMathStep = {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             onSubmitMathStep()
-                        }
-                    )
-                }
-                ChallengeMode.PHRASE -> {
-                    PhraseTypingPuzzleCard(
-                        challenge = challenge,
+                        },
                         onPhraseChanged = onPhraseChanged,
-                        onConfirmUnlock = {
+                        onConfirmPhraseUnlock = {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             onConfirmPhraseUnlock()
                         }
                     )
+
+                    Button(
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onKeepLocked()
+                        },
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(62.dp)
+                            .testTag("keep_locked_return_button")
+                    ) {
+                        Text(
+                            text = returnLabel,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Primary Escape Button: Stay Focused
-            Button(
-                onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onKeepLocked()
-                },
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ),
+@Composable
+private fun PuzzleModeSelectorBar(
+    currentMode: ChallengeMode,
+    onSwitchMode: (ChallengeMode) -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = CircleShape,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            PuzzleModeTab(
+                label = "Pattern",
+                icon = Icons.Filled.Apps,
+                selected = currentMode == ChallengeMode.MEMORY_GRID,
+                onClick = { onSwitchMode(ChallengeMode.MEMORY_GRID) },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .testTag("keep_locked_return_button")
-            ) {
-                Text(
-                    text = if (challenge.reason == FrictionReason.QUIT_FOCUS_LOCK_EARLY) {
-                        "Keep Reading (${challenge.targetAppName ?: "Locked"})"
-                    } else {
-                        "Keep App Locked"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                    .weight(1f)
+                    .testTag("mode_pattern_tab")
+            )
+            PuzzleModeTab(
+                label = "Math",
+                icon = Icons.Filled.Calculate,
+                selected = currentMode == ChallengeMode.MATH_CHAIN,
+                onClick = { onSwitchMode(ChallengeMode.MATH_CHAIN) },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("mode_math_tab")
+            )
+            PuzzleModeTab(
+                label = "Phrase",
+                icon = Icons.Filled.Keyboard,
+                selected = currentMode == ChallengeMode.PHRASE,
+                onClick = { onSwitchMode(ChallengeMode.PHRASE) },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("mode_phrase_tab")
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActivePuzzleContent(
+    challenge: FrictionChallengeState,
+    onTapMemoryTile: (Int) -> Unit,
+    onReplayMemoryPattern: () -> Unit,
+    onMathInputChanged: (String) -> Unit,
+    onSubmitMathStep: () -> Unit,
+    onPhraseChanged: (String) -> Unit,
+    onConfirmPhraseUnlock: () -> Unit
+) {
+    when (challenge.mode) {
+        ChallengeMode.MEMORY_GRID -> {
+            MemoryGridPuzzleCard(
+                challenge = challenge,
+                onTapTile = onTapMemoryTile,
+                onReplayPattern = onReplayMemoryPattern
+            )
+        }
+        ChallengeMode.MATH_CHAIN -> {
+            HardMathPuzzleCard(
+                challenge = challenge,
+                onMathInputChanged = onMathInputChanged,
+                onSubmitMathStep = onSubmitMathStep
+            )
+        }
+        ChallengeMode.PHRASE -> {
+            PhraseTypingPuzzleCard(
+                challenge = challenge,
+                onPhraseChanged = onPhraseChanged,
+                onConfirmUnlock = onConfirmPhraseUnlock
+            )
         }
     }
 }
@@ -276,7 +439,7 @@ fun FrictionShieldOverlay(
 @Composable
 private fun PuzzleModeTab(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -325,9 +488,9 @@ private fun MemoryGridPuzzleCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -360,7 +523,7 @@ private fun MemoryGridPuzzleCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 320.dp),
+                    .widthIn(max = 310.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 for (row in 0 until 4) {

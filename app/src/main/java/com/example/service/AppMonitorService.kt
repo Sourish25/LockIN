@@ -29,7 +29,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Foreground Service that maintains ChapterLock's ongoing system presence,
+ * Foreground Service that maintains LockIN's ongoing system presence,
  * periodic UsageStats synchronization, and fallback foreground app detection.
  */
 class AppMonitorService : Service() {
@@ -49,15 +49,6 @@ class AppMonitorService : Service() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start AppMonitorService", e)
-            }
-        }
-
-        fun stop(context: Context) {
-            try {
-                val intent = Intent(context, AppMonitorService::class.java)
-                context.stopService(intent)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to stop AppMonitorService", e)
             }
         }
     }

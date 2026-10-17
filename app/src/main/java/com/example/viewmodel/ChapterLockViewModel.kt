@@ -113,7 +113,6 @@ data class ChapterLockUiState(
     val editingRule: AppTimerRuleEntity? = null,
     val showAddAppSheet: Boolean = false,
     val showSelectFocusAppSheet: Boolean = false,
-    val appSearchQuery: String = "",
     val discoveredApps: List<DiscoveredDeviceApp> = emptyList(),
     val hasUsageStatsPermission: Boolean = false,
     val hasAccessibilityPermission: Boolean = false,
@@ -124,12 +123,6 @@ data class ChapterLockUiState(
 ) {
     val selectedFocusApp: PinnedFocusAppEntity?
         get() = pinnedFocusApps.firstOrNull { it.isSelected } ?: pinnedFocusApps.firstOrNull()
-
-    val blockedAppsCount: Int
-        get() = appRules.count { it.isCurrentlyBlocked(activeSession.isActive) }
-
-    val areAllCorePermissionsGranted: Boolean
-        get() = hasUsageStatsPermission && hasAccessibilityPermission
 }
 
 private data class InternalControlState(
@@ -139,7 +132,6 @@ private data class InternalControlState(
     val showAddAppSheet: Boolean = false,
     val showSelectFocusAppSheet: Boolean = false,
     val showPermissionsSheet: Boolean = false,
-    val appSearchQuery: String = "",
     val discoveredApps: List<DiscoveredDeviceApp> = emptyList(),
     val hasUsageStatsPermission: Boolean = false,
     val hasAccessibilityPermission: Boolean = false,
@@ -203,7 +195,6 @@ class ChapterLockViewModel(
             editingRule = ctrl.editingRule,
             showAddAppSheet = ctrl.showAddAppSheet,
             showSelectFocusAppSheet = ctrl.showSelectFocusAppSheet,
-            appSearchQuery = ctrl.appSearchQuery,
             discoveredApps = ctrl.discoveredApps,
             hasUsageStatsPermission = ctrl.hasUsageStatsPermission,
             hasAccessibilityPermission = ctrl.hasAccessibilityPermission,
@@ -298,10 +289,6 @@ class ChapterLockViewModel(
         controlState.update { it.copy(currentTab = tab) }
     }
 
-    fun setAppSearchQuery(query: String) {
-        controlState.update { it.copy(appSearchQuery = query) }
-    }
-
     // --- Focus Lock Controls ---
 
     fun selectFocusDuration(minutes: Int) {
@@ -337,7 +324,7 @@ class ChapterLockViewModel(
     }
 
     fun setShowSelectFocusAppSheet(visible: Boolean) {
-        controlState.update { it.copy(showSelectFocusAppSheet = visible, appSearchQuery = "") }
+        controlState.update { it.copy(showSelectFocusAppSheet = visible) }
     }
 
     fun selectPinnedFocusApp(packageName: String) {
@@ -388,7 +375,7 @@ class ChapterLockViewModel(
     }
 
     fun setShowAddAppSheet(visible: Boolean) {
-        controlState.update { it.copy(showAddAppSheet = visible, appSearchQuery = "") }
+        controlState.update { it.copy(showAddAppSheet = visible) }
     }
 
     fun addOrUpdateAppLimitRule(

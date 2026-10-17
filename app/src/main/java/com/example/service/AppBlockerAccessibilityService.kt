@@ -45,7 +45,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         isServiceConnected = true
-        Log.i(TAG, "ChapterLock Accessibility Service connected successfully.")
+        Log.i(TAG, "LockIN Accessibility Service connected successfully.")
 
         createNotificationChannel()
 
@@ -109,17 +109,15 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             Log.e(TAG, "Failed to perform global action home", e)
         }
 
-        // 2. Launch ChapterLock Friction Shield directly
+        // 2. Launch LockIN Friction Shield directly
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             putExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE, decision.packageName)
             putExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON, decision.reason.name)
         }
 
-        var directLaunchSucceeded = false
         try {
             startActivity(intent)
-            directLaunchSucceeded = true
         } catch (e: Exception) {
             Log.e(TAG, "Direct startActivity blocked by background restrictions", e)
         }
@@ -185,13 +183,13 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        Log.w(TAG, "ChapterLock Accessibility Service interrupted.")
+        Log.w(TAG, "LockIN Accessibility Service interrupted.")
     }
 
     override fun onDestroy() {
         isServiceConnected = false
         serviceScope.cancel()
         super.onDestroy()
-        Log.i(TAG, "ChapterLock Accessibility Service destroyed.")
+        Log.i(TAG, "LockIN Accessibility Service destroyed.")
     }
 }

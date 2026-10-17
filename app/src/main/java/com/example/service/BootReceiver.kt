@@ -6,19 +6,19 @@ import android.content.Intent
 import android.util.Log
 
 /**
- * Ensures ChapterLock automatically restores background guarding, app limit enforcement,
- * and light novel focus state after the device reboots or the app updates.
+ * Restores LockIN background guarding, daily app limit enforcement,
+ * and active reading focus sessions after device reboot or app update.
  */
 class BootReceiver : BroadcastReceiver() {
 
     companion object {
-        private const val TAG = "ChapterLockBoot"
+        private const val TAG = "LockINBoot"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            Log.i(TAG, "Device rebooted or package replaced ($action). Restoring ChapterLock guard.")
+            Log.i(TAG, "Device rebooted or package replaced ($action). Restoring LockIN guard.")
             try {
                 AppMonitorService.start(context)
             } catch (e: Exception) {

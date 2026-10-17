@@ -34,7 +34,6 @@ object ChapterLockEnforcer {
     private val pinnedFocusAppName = AtomicReference("")
     private val focusLockEndTimeMs = AtomicLong(0L)
 
-    private val blockedPackages = ConcurrentHashMap<String, String>() // packageName -> appName
     private val appRulesMap = ConcurrentHashMap<String, AppTimerRuleEntity>()
     private val temporaryUnlocks = ConcurrentHashMap<String, Long>() // packageName -> unlockUntilEpochMs
 
@@ -75,24 +74,17 @@ object ChapterLockEnforcer {
     fun syncRules(rules: List<AppTimerRuleEntity>) {
         appRulesMap.clear()
         val now = System.currentTimeMillis()
-        val newBlocked = mutableMapOf<String, String>()
         for (rule in rules) {
             appRulesMap[rule.packageName] = rule
             if (rule.unlockedUntilEpochMs > now) {
                 temporaryUnlocks[rule.packageName] = rule.unlockedUntilEpochMs
             }
-            if (rule.isCurrentlyBlocked(isReadingSessionActive = false, nowMs = now)) {
-                newBlocked[rule.packageName] = rule.appName
-            }
         }
-        blockedPackages.clear()
-        blockedPackages.putAll(newBlocked)
     }
 
     fun grantTemporaryUnlock(packageName: String, durationMinutes: Int) {
         val until = System.currentTimeMillis() + (durationMinutes * 60_000L)
         temporaryUnlocks[packageName] = until
-        blockedPackages.remove(packageName)
     }
 
     fun isPackageTemporarilyUnlocked(packageName: String): Boolean {

@@ -31,9 +31,9 @@ All screenshots below are rendered directly from the Jetpack Compose UI layer.
 
 LockIN includes a responsive two-pane canonical layout with a persistent navigation rail optimized for tablets and 3:2 reading displays (such as the Xiaomi Pad 7).
 
-<p align="center">
-  <img src="docs/screenshots/tablet_3_2_layout.png" width="720" alt="Tablet 3:2 Adaptive Layout" />
-</p>
+| Tablet Daily App Limits (3:2) | Tablet Focus Lock Chamber (3:2) |
+| :---: | :---: |
+| <img src="docs/screenshots/tablet_app_limits_layout.png" width="420" alt="Tablet Daily App Limits Layout" /> | <img src="docs/screenshots/tablet_3_2_layout.png" width="420" alt="Tablet Focus Lock Layout" /> |
 
 ## Architecture and Technical Highlights
 
@@ -45,12 +45,14 @@ LockIN includes a responsive two-pane canonical layout with a persistent navigat
 
 ## Releases and ABI Architecture Downloads
 
-Starting with v1.0.0, release builds are split by CPU ABI so you can install the smallest native binary for your device. Check the GitHub Releases page for prebuilt APK downloads and `SHA256SUMS.txt` verification hashes:
+Release builds are split by CPU ABI so you can install the smallest native binary for your device. Prebuilt release APKs and `SHA256SUMS.txt` verification hashes are available in `releases/v1.0.0/` as well as on the GitHub Releases page:
 
-* `LockIN-v1.0.0-arm64-v8a.apk`: Recommended for almost all modern 64-bit Android phones and tablets (ARMv8-A).
-* `LockIN-v1.0.0-armeabi-v7a.apk`: For older 32-bit ARM Android devices (ARMv7-A).
-* `LockIN-v1.0.0-x86_64.apk`: For 64-bit x86 tablets, Chromebooks, and Android emulators.
-* `LockIN-v1.0.0-universal.apk`: Universal build containing all architectures in a single package.
+* [`LockIN-v1.0.0-arm64-v8a.apk`](releases/v1.0.0/LockIN-v1.0.0-arm64-v8a.apk): Recommended for 64-bit ARM Android phones and tablets (ARMv8-A).
+* [`LockIN-v1.0.0-armeabi-v7a.apk`](releases/v1.0.0/LockIN-v1.0.0-armeabi-v7a.apk): For 32-bit ARM Android devices (ARMv7-A).
+* [`LockIN-v1.0.0-x86_64.apk`](releases/v1.0.0/LockIN-v1.0.0-x86_64.apk): For 64-bit x86 tablets, Chromebooks, and Android emulators.
+* [`LockIN-v1.0.0-x86.apk`](releases/v1.0.0/LockIN-v1.0.0-x86.apk): For 32-bit x86 devices and legacy emulators.
+* [`LockIN-v1.0.0-universal.apk`](releases/v1.0.0/LockIN-v1.0.0-universal.apk): Universal package containing all CPU architectures (`arm64-v8a`, `armeabi-v7a`, `x86`, and `x86_64`).
+* [`SHA256SUMS.txt`](releases/v1.0.0/SHA256SUMS.txt): SHA-256 checksums for all release APKs.
 
 ## Required Android Permissions
 

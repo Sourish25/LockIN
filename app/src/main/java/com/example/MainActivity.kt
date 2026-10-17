@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -27,7 +28,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Lock
@@ -36,8 +39,6 @@ import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -52,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -70,12 +72,14 @@ import com.example.service.AppMonitorService
 import com.example.service.ChapterLockEnforcer
 import com.example.ui.components.AddAppTimerBottomSheet
 import com.example.ui.components.EditAppLimitBottomSheet
+import com.example.ui.components.ExpressiveCloverShape
 import com.example.ui.components.ExpressiveSealShape
 import com.example.ui.components.FrictionShieldOverlay
 import com.example.ui.components.SelectFocusAppBottomSheet
 import com.example.ui.components.SystemPermissionsBottomSheet
 import com.example.ui.screens.AppVaultScreen
 import com.example.ui.screens.ReadAndLockScreen
+import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.AppTab
 import com.example.viewmodel.ChapterLockUiState
@@ -90,7 +94,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Always ensure the background guardian service is running
+        // Ensure the background guardian service is running
         AppMonitorService.start(applicationContext)
 
         setContent {
@@ -108,7 +112,6 @@ class MainActivity : ComponentActivity() {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             var useDynamicWallpaper by rememberSaveable { mutableStateOf(false) }
 
-            // Handle intent on initial launch
             LaunchedEffect(intent) {
                 checkAndHandleIntent(intent, viewModel)
             }
@@ -189,7 +192,6 @@ class MainActivity : ComponentActivity() {
         val interceptReason = intent.getStringExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON)
         if (!interceptedPkg.isNullOrBlank()) {
             vm.handleInterception(interceptedPkg, interceptReason ?: "INTERCEPTED")
-            // Clear extras so rotation doesn't re-trigger
             intent.removeExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE)
             intent.removeExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON)
         }
@@ -225,15 +227,7 @@ fun ChapterLockRoot(
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 contentWindowInsets = WindowInsets.safeDrawing,
-                containerColor = MaterialTheme.colorScheme.background,
-                topBar = {
-                    ExpressiveTopBar(
-                        currentTab = uiState.currentTab,
-                        activeFocusRunning = uiState.activeSession.isActive,
-                        useDynamicWallpaper = useDynamicWallpaper,
-                        onToggleWallpaperTheme = onToggleWallpaperTheme
-                    )
-                }
+                containerColor = MaterialTheme.colorScheme.background
             ) { innerPadding ->
                 Box(
                     modifier = Modifier
@@ -242,55 +236,71 @@ fun ChapterLockRoot(
                 ) {
                     Row(modifier = Modifier.fillMaxSize()) {
                         if (isTablet) {
-                            CleanNavigationRail(
+                            ExpressiveNavigationRail(
                                 currentTab = uiState.currentTab,
+                                activeFocusRunning = uiState.activeSession.isActive,
                                 onSelectTab = viewModel::selectTab
                             )
                         }
 
-                        Box(
+                        Column(
                             modifier = Modifier
-                                .fillMaxSize()
                                 .weight(1f)
+                                .fillMaxHeight()
                         ) {
-                            when (uiState.currentTab) {
-                                AppTab.APP_LIMITS -> {
-                                    AppVaultScreen(
-                                        appRules = uiState.appRules,
-                                        isFocusSessionActive = uiState.activeSession.isActive,
-                                        hasUsageStatsPermission = uiState.hasUsageStatsPermission,
-                                        hasAccessibilityPermission = uiState.hasAccessibilityPermission,
-                                        isIgnoringBattery = uiState.isIgnoringBatteryOptimizations,
-                                        isXiaomi = uiState.isXiaomiDevice,
-                                        isTablet = isTablet,
-                                        onOpenUsageAccessSettings = onLaunchUsageSettings,
-                                        onOpenAccessibilitySettings = onLaunchAccessibilitySettings,
-                                        onOpenPermissionsSheet = onOpenPermissionsSheet,
-                                        onTapAppRule = viewModel::onTapAppRuleCard,
-                                        onRequestUnlockApp = { rule ->
-                                            viewModel.openFrictionChallenge(
-                                                reason = FrictionReason.UNLOCK_BLOCKED_APP,
-                                                targetAppName = rule.appName,
-                                                targetPackageName = rule.packageName
-                                            )
-                                        },
-                                        onOpenAddAppSheet = { viewModel.setShowAddAppSheet(true) }
-                                    )
-                                }
+                            ExpressiveTopBar(
+                                currentTab = uiState.currentTab,
+                                activeFocusRunning = uiState.activeSession.isActive,
+                                useDynamicWallpaper = useDynamicWallpaper,
+                                isTablet = isTablet,
+                                onToggleWallpaperTheme = onToggleWallpaperTheme
+                            )
 
-                                AppTab.FOCUS_LOCK -> {
-                                    ReadAndLockScreen(
-                                        selectedFocusApp = uiState.selectedFocusApp,
-                                        activeSession = uiState.activeSession,
-                                        isTablet = isTablet,
-                                        onSelectDuration = viewModel::selectFocusDuration,
-                                        onStartFocusLock = { viewModel.startFocusLock(context) },
-                                        onLaunchPinnedApp = onLaunchPinnedApp,
-                                        onRequestQuitFocusEarly = viewModel::requestQuitFocusLockEarly,
-                                        onOpenSelectFocusAppSheet = {
-                                            viewModel.setShowSelectFocusAppSheet(true)
-                                        }
-                                    )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            ) {
+                                when (uiState.currentTab) {
+                                    AppTab.APP_LIMITS -> {
+                                        AppVaultScreen(
+                                            appRules = uiState.appRules,
+                                            isFocusSessionActive = uiState.activeSession.isActive,
+                                            hasUsageStatsPermission = uiState.hasUsageStatsPermission,
+                                            hasAccessibilityPermission = uiState.hasAccessibilityPermission,
+                                            hasOverlayPermission = uiState.hasOverlayPermission,
+                                            isTablet = isTablet,
+                                            onOpenUsageAccessSettings = onLaunchUsageSettings,
+                                            onOpenAccessibilitySettings = onLaunchAccessibilitySettings,
+                                            onOpenOverlaySettings = onLaunchOverlaySettings,
+                                            onOpenPermissionsSheet = onOpenPermissionsSheet,
+                                            onTapAppRule = viewModel::onTapAppRuleCard,
+                                            onRequestUnlockApp = { rule ->
+                                                viewModel.openFrictionChallenge(
+                                                    reason = FrictionReason.UNLOCK_BLOCKED_APP,
+                                                    targetAppName = rule.appName,
+                                                    targetPackageName = rule.packageName
+                                                )
+                                            },
+                                            onOpenAddAppSheet = { viewModel.setShowAddAppSheet(true) }
+                                        )
+                                    }
+
+                                    AppTab.FOCUS_LOCK -> {
+                                        ReadAndLockScreen(
+                                            selectedFocusApp = uiState.selectedFocusApp,
+                                            activeSession = uiState.activeSession,
+                                            focusHistoryCount = uiState.focusHistory.size,
+                                            isTablet = isTablet,
+                                            onSelectDuration = viewModel::selectFocusDuration,
+                                            onStartFocusLock = { viewModel.startFocusLock(context) },
+                                            onLaunchPinnedApp = onLaunchPinnedApp,
+                                            onRequestQuitFocusEarly = viewModel::requestQuitFocusLockEarly,
+                                            onOpenSelectFocusAppSheet = {
+                                                viewModel.setShowSelectFocusAppSheet(true)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -377,28 +387,34 @@ fun ChapterLockRoot(
 }
 
 @Composable
-private fun ExpressiveTopBar(
+internal fun ExpressiveTopBar(
     currentTab: AppTab,
     activeFocusRunning: Boolean,
     useDynamicWallpaper: Boolean,
+    isTablet: Boolean,
     onToggleWallpaperTheme: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 22.dp, vertical = 14.dp),
+            .then(if (!isTablet) Modifier.statusBarsPadding() else Modifier)
+            .padding(
+                horizontal = if (isTablet) 24.dp else 20.dp,
+                vertical = if (isTablet) 14.dp else 12.dp
+            ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = when (currentTab) {
-                AppTab.APP_LIMITS -> "App Limits"
-                AppTab.FOCUS_LOCK -> "Focus Lock"
-            },
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+        Column {
+            Text(
+                text = when (currentTab) {
+                    AppTab.APP_LIMITS -> "App Limits"
+                    AppTab.FOCUS_LOCK -> "Focus Lock"
+                },
+                style = MaterialTheme.typography.displayMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -489,8 +505,8 @@ private fun FloatingExpressivePillDock(
 private fun ExpressiveDockPillItem(
     label: String,
     selected: Boolean,
-    selectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
-    unselectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    selectedIcon: ImageVector,
+    unselectedIcon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -543,39 +559,154 @@ private fun ExpressiveDockPillItem(
 }
 
 @Composable
-private fun CleanNavigationRail(
+internal fun ExpressiveNavigationRail(
     currentTab: AppTab,
+    activeFocusRunning: Boolean,
     onSelectTab: (AppTab) -> Unit
 ) {
-    NavigationRail(
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxHeight()
+    val haptics = LocalHapticFeedback.current
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp),
+        modifier = Modifier
+            .width(104.dp)
+            .fillMaxHeight()
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-        NavigationRailItem(
-            selected = currentTab == AppTab.APP_LIMITS,
-            onClick = { onSelectTab(AppTab.APP_LIMITS) },
-            icon = {
-                Icon(
-                    imageVector = if (currentTab == AppTab.APP_LIMITS) Icons.Filled.HourglassBottom
-                    else Icons.Outlined.HourglassEmpty,
-                    contentDescription = "App Limits"
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = 20.dp, horizontal = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Top Brand Emblem
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(ExpressiveCloverShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = "LockIN",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Text(
+                    text = "LockIN",
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-            },
-            label = { Text("App Limits") }
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        NavigationRailItem(
-            selected = currentTab == AppTab.FOCUS_LOCK,
-            onClick = { onSelectTab(AppTab.FOCUS_LOCK) },
-            icon = {
-                Icon(
-                    imageVector = if (currentTab == AppTab.FOCUS_LOCK) Icons.Filled.Lock
-                    else Icons.Outlined.Lock,
-                    contentDescription = "Focus Lock"
+            }
+
+            // Center Navigation Items
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                ExpressiveRailItem(
+                    label = "Limits",
+                    selected = currentTab == AppTab.APP_LIMITS,
+                    selectedIcon = Icons.Filled.HourglassBottom,
+                    unselectedIcon = Icons.Outlined.HourglassEmpty,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSelectTab(AppTab.APP_LIMITS)
+                    },
+                    modifier = Modifier.testTag("nav_tab_app_vault")
                 )
-            },
-            label = { Text("Focus Lock") }
+
+                ExpressiveRailItem(
+                    label = "Focus",
+                    selected = currentTab == AppTab.FOCUS_LOCK,
+                    selectedIcon = Icons.Filled.Lock,
+                    unselectedIcon = Icons.Outlined.Lock,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSelectTab(AppTab.FOCUS_LOCK)
+                    },
+                    modifier = Modifier.testTag("nav_tab_read_lock")
+                )
+            }
+
+            // Bottom Status Pill
+            Surface(
+                color = if (activeFocusRunning) MaterialTheme.colorScheme.tertiaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = CircleShape
+            ) {
+                Text(
+                    text = if (activeFocusRunning) "LOCKED" else "GUARD",
+                    fontFamily = JetBrainsMonoFontFamily,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (activeFocusRunning) MaterialTheme.colorScheme.onTertiaryContainer
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpressiveRailItem(
+    label: String,
+    selected: Boolean,
+    selectedIcon: ImageVector,
+    unselectedIcon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.surfaceContainerHigh,
+        label = "RailItemBg"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "RailItemContent"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(64.dp)
+                .height(40.dp)
+                .clip(CircleShape)
+                .background(bgColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (selected) selectedIcon else unselectedIcon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

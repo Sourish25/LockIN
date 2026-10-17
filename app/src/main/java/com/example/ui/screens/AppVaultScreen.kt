@@ -5,8 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,15 +19,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -69,11 +64,11 @@ fun AppVaultScreen(
     isFocusSessionActive: Boolean,
     hasUsageStatsPermission: Boolean,
     hasAccessibilityPermission: Boolean,
-    isIgnoringBattery: Boolean = false,
-    isXiaomi: Boolean = false,
+    hasOverlayPermission: Boolean = false,
     isTablet: Boolean,
     onOpenUsageAccessSettings: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
+    onOpenOverlaySettings: () -> Unit = {},
     onOpenPermissionsSheet: () -> Unit,
     onTapAppRule: (AppTimerRuleEntity) -> Unit,
     onRequestUnlockApp: (AppTimerRuleEntity) -> Unit,
@@ -83,64 +78,86 @@ fun AppVaultScreen(
     val haptics = LocalHapticFeedback.current
     val blockedRules = appRules.filter { it.isCurrentlyBlocked(isFocusSessionActive) }
     val activeRules = appRules.filterNot { it.isCurrentlyBlocked(isFocusSessionActive) }
+    val totalUsedMinutesToday = appRules.sumOf { it.usedMinutesToday }
 
     if (isTablet) {
         // --- TABLET 2-PANE ADAPTIVE LAYOUT (Optimized for Xiaomi Pad 7 3:2 ratio) ---
         Row(
             modifier = modifier
                 .fillMaxSize()
-                .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp)
+                .testTag("app_vault_screen"),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Left Column: Hero Bento + Live Permission Status + CTA (scrollable for all orientations)
+            // Left Pane: Hero Bento + Live Permission Status
             Column(
                 modifier = Modifier
-                    .widthIn(min = 320.dp, max = 380.dp)
+                    .weight(0.42f)
                     .fillMaxHeight()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Hero Bento Card
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(36.dp),
+                    shape = RoundedCornerShape(32.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
-                            shape = CircleShape
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = if (blockedRules.isNotEmpty()) "RESTRICTIONS ACTIVE" else "DAILY SCREEN TIME GUARD",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.14f),
+                                shape = CircleShape
+                            ) {
+                                Text(
+                                    text = if (blockedRules.isNotEmpty()) "RESTRICTIONS ACTIVE" else "DAILY SCREEN TIME GUARD",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                )
+                            }
+
+                            if (totalUsedMinutesToday > 0) {
+                                Text(
+                                    text = "${formatMinutesClean(totalUsedMinutesToday)} today",
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                                )
+                            }
                         }
 
+                        val count = if (blockedRules.isNotEmpty()) blockedRules.size else appRules.size
                         Row(
                             verticalAlignment = Alignment.Bottom,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text = "${if (blockedRules.isNotEmpty()) blockedRules.size else appRules.size}",
+                                text = "$count",
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 60.sp,
-                                lineHeight = 60.sp,
+                                fontSize = 52.sp,
+                                lineHeight = 52.sp,
                                 letterSpacing = (-2.0).sp,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = if (blockedRules.isNotEmpty()) "apps locked\nfor today" else "apps with\ndaily timers",
+                                text = if (blockedRules.isNotEmpty()) {
+                                    if (count == 1) "app locked\nfor today" else "apps locked\nfor today"
+                                } else {
+                                    if (count == 1) "app with\ndaily timer" else "apps with\ndaily timers"
+                                },
                                 style = MaterialTheme.typography.titleMedium,
                                 lineHeight = 20.sp,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
-                                modifier = Modifier.padding(bottom = 6.dp)
+                                modifier = Modifier.padding(bottom = 4.dp)
                             )
                         }
 
@@ -156,7 +173,7 @@ fun AppVaultScreen(
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(56.dp)
+                                .height(48.dp)
                                 .testTag("open_add_app_sheet_button")
                         ) {
                             Icon(imageVector = Icons.Filled.Add, contentDescription = null)
@@ -166,15 +183,15 @@ fun AppVaultScreen(
                     }
                 }
 
-                // Live Android Permissions Status Box
+                // Live Android Permissions Status Card
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(32.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
                             text = "SYSTEM ENFORCEMENT",
@@ -184,16 +201,23 @@ fun AppVaultScreen(
 
                         PermissionStatusItem(
                             title = "Usage Access",
-                            subtitle = "Tracks daily minutes",
+                            subtitle = "Tracks daily screen time",
                             isGranted = hasUsageStatsPermission,
                             onClick = onOpenUsageAccessSettings
                         )
 
                         PermissionStatusItem(
                             title = "Accessibility Blocker",
-                            subtitle = "Real-time instant interceptor",
+                            subtitle = "Instant window interceptor",
                             isGranted = hasAccessibilityPermission,
                             onClick = onOpenAccessibilitySettings
+                        )
+
+                        PermissionStatusItem(
+                            title = "Overlay Shield",
+                            subtitle = "Displays puzzle barrier",
+                            isGranted = hasOverlayPermission,
+                            onClick = onOpenOverlaySettings
                         )
 
                         FilledTonalButton(
@@ -201,7 +225,7 @@ fun AppVaultScreen(
                             shape = CircleShape,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(44.dp)
+                                .height(42.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Security,
@@ -215,29 +239,57 @@ fun AppVaultScreen(
                 }
             }
 
-            // Right Column: Responsive Grid of App Cards
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 320.dp),
+            // Right Pane: Grouped Expressive App List aligned flush with Left Pane
+            LazyColumn(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(0.58f)
                     .fillMaxHeight(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(bottom = 32.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
             ) {
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "TRACKED APPLICATIONS",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "${activeRules.size} ACTIVE • ${blockedRules.size} LOCKED",
+                                fontFamily = JetBrainsMonoFontFamily,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
                 if (blockedRules.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
+                    item {
                         Text(
-                            text = "BLOCKED APPS",
+                            text = "LOCKED FOR TODAY",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                            modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 2.dp)
                         )
                     }
-                    items(blockedRules, key = { "b_${it.packageName}" }) { rule ->
+                    itemsIndexed(blockedRules, key = { _, r -> "b_${r.packageName}" }) { index, rule ->
                         ExpressiveBlockedAppCard(
                             rule = rule,
-                            shape = RoundedCornerShape(28.dp),
+                            shape = expressiveGroupedCardShape(index, blockedRules.size, 30.dp, 10.dp),
                             onTapCard = {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onTapAppRule(rule)
@@ -251,18 +303,18 @@ fun AppVaultScreen(
                 }
 
                 if (activeRules.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
+                    item {
                         Text(
                             text = "ACTIVE DAILY LIMITS",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                            modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 2.dp)
                         )
                     }
-                    items(activeRules, key = { "a_${it.packageName}" }) { rule ->
+                    itemsIndexed(activeRules, key = { _, r -> "a_${r.packageName}" }) { index, rule ->
                         ExpressiveActiveAppCard(
                             rule = rule,
-                            shape = RoundedCornerShape(28.dp),
+                            shape = expressiveGroupedCardShape(index, activeRules.size, 30.dp, 10.dp),
                             onTapCard = {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onTapAppRule(rule)
@@ -272,7 +324,7 @@ fun AppVaultScreen(
                 }
 
                 if (blockedRules.isEmpty() && activeRules.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
+                    item {
                         EmptyAppVaultCard(onOpenAddAppSheet = onOpenAddAppSheet)
                     }
                 }
@@ -284,11 +336,12 @@ fun AppVaultScreen(
             modifier = modifier
                 .fillMaxSize()
                 .testTag("app_vault_screen"),
-            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 112.dp),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Asymmetric Split Bento Header
             item {
+                val count = if (blockedRules.isNotEmpty()) blockedRules.size else appRules.size
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -329,7 +382,7 @@ fun AppVaultScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
-                                    text = "${if (blockedRules.isNotEmpty()) blockedRules.size else appRules.size}",
+                                    text = "$count",
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 52.sp,
@@ -337,7 +390,11 @@ fun AppVaultScreen(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    text = if (blockedRules.isNotEmpty()) "apps\nblocked" else "active\nlimits",
+                                    text = if (blockedRules.isNotEmpty()) {
+                                        if (count == 1) "app\nblocked" else "apps\nblocked"
+                                    } else {
+                                        if (count == 1) "active\nlimit" else "active\nlimits"
+                                    },
                                     style = MaterialTheme.typography.titleMedium,
                                     lineHeight = 18.sp,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
@@ -608,7 +665,7 @@ private fun PermissionStatusItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp, vertical = 9.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -790,7 +847,7 @@ private fun ExpressiveActiveAppCard(
                         )
                         Text(
                             text = if (rule.isTemporarilyUnlocked()) "10m pass active"
-                            else "${formatMinutesClean(rule.remainingMinutesToday)} left today",
+                            else "${formatMinutesClean(rule.usedMinutesToday)} used • ${formatMinutesClean(rule.remainingMinutesToday)} left today",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

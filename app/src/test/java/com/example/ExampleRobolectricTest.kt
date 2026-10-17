@@ -6,8 +6,6 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
@@ -23,6 +21,7 @@ import com.example.ui.screens.AppVaultScreen
 import com.example.ui.screens.ReadAndLockScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.ActiveFocusSessionState
+import com.example.viewmodel.AppTab
 import com.example.viewmodel.ChallengeMode
 import com.example.viewmodel.FrictionChallengeState
 import com.example.viewmodel.FrictionReason
@@ -184,8 +183,7 @@ class ExampleRobolectricTest {
                         isFocusSessionActive = false,
                         hasUsageStatsPermission = true,
                         hasAccessibilityPermission = true,
-                        isIgnoringBattery = true,
-                        isXiaomi = false,
+                        hasOverlayPermission = true,
                         isTablet = false,
                         onOpenUsageAccessSettings = {},
                         onOpenAccessibilitySettings = {},
@@ -304,21 +302,115 @@ class ExampleRobolectricTest {
         composeTestRule.setContent {
             MyApplicationTheme(darkTheme = true, dynamicColor = false) {
                 Box(modifier = Modifier.size(width = 960.dp, height = 640.dp)) {
-                    ReadAndLockScreen(
-                        selectedFocusApp = readerApp,
-                        activeSession = session,
-                        isTablet = true,
-                        onSelectDuration = {},
-                        onStartFocusLock = {},
-                        onLaunchPinnedApp = {},
-                        onRequestQuitFocusEarly = {},
-                        onOpenSelectFocusAppSheet = {}
-                    )
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.size(width = 960.dp, height = 640.dp)
+                    ) {
+                        ExpressiveNavigationRail(
+                            currentTab = AppTab.FOCUS_LOCK,
+                            activeFocusRunning = false,
+                            onSelectTab = {}
+                        )
+                        androidx.compose.foundation.layout.Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            ExpressiveTopBar(
+                                currentTab = AppTab.FOCUS_LOCK,
+                                activeFocusRunning = false,
+                                useDynamicWallpaper = false,
+                                isTablet = true,
+                                onToggleWallpaperTheme = {}
+                            )
+                            ReadAndLockScreen(
+                                selectedFocusApp = readerApp,
+                                activeSession = session,
+                                focusHistoryCount = 6,
+                                isTablet = true,
+                                onSelectDuration = {},
+                                onStartFocusLock = {},
+                                onLaunchPinnedApp = {},
+                                onRequestQuitFocusEarly = {},
+                                onOpenSelectFocusAppSheet = {}
+                            )
+                        }
+                    }
                 }
             }
         }
         composeTestRule.mainClock.advanceTimeBy(1000L)
         saveScreenshot("tablet_3_2_layout.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h640dp-xhdpi")
+    fun `capture real screenshot of Tablet 3 to 2 AppLimits layout`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val rules = listOf(
+            AppTimerRuleEntity(
+                packageName = "com.instagram.android",
+                appName = "Instagram",
+                category = "Social",
+                dailyLimitMinutes = 45,
+                usedMinutesToday = 45
+            ),
+            AppTimerRuleEntity(
+                packageName = "com.google.android.youtube",
+                appName = "YouTube",
+                category = "Video",
+                dailyLimitMinutes = 60,
+                usedMinutesToday = 32
+            ),
+            AppTimerRuleEntity(
+                packageName = "com.zhiliaoapp.musically",
+                appName = "TikTok",
+                category = "Short Video",
+                dailyLimitMinutes = 30,
+                usedMinutesToday = 12
+            )
+        )
+
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                Box(modifier = Modifier.size(width = 960.dp, height = 640.dp)) {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.size(width = 960.dp, height = 640.dp)
+                    ) {
+                        ExpressiveNavigationRail(
+                            currentTab = AppTab.APP_LIMITS,
+                            activeFocusRunning = false,
+                            onSelectTab = {}
+                        )
+                        androidx.compose.foundation.layout.Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            ExpressiveTopBar(
+                                currentTab = AppTab.APP_LIMITS,
+                                activeFocusRunning = false,
+                                useDynamicWallpaper = false,
+                                isTablet = true,
+                                onToggleWallpaperTheme = {}
+                            )
+                            AppVaultScreen(
+                                appRules = rules,
+                                isFocusSessionActive = false,
+                                hasUsageStatsPermission = true,
+                                hasAccessibilityPermission = true,
+                                hasOverlayPermission = true,
+                                isTablet = true,
+                                onOpenUsageAccessSettings = {},
+                                onOpenAccessibilitySettings = {},
+                                onOpenOverlaySettings = {},
+                                onOpenPermissionsSheet = {},
+                                onTapAppRule = {},
+                                onRequestUnlockApp = {},
+                                onOpenAddAppSheet = {}
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(1000L)
+        saveScreenshot("tablet_app_limits_layout.png")
     }
 
     private fun saveScreenshot(fileName: String) {

@@ -18,8 +18,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -40,6 +38,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -67,14 +66,17 @@ import com.example.ui.components.scallopedCookieShape
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.viewmodel.ActiveFocusSessionState
 
-private val FOCUS_DURATION_OPTIONS = listOf(15, 30, 45, 60, 90, 120)
+private val FOCUS_DURATION_ROWS = listOf(
+    listOf(15, 30, 45),
+    listOf(60, 90, 120)
+)
 private val GiantStarburstShape = scallopedCookieShape(lobes = 12, waveDepthFraction = 0.065f)
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ReadAndLockScreen(
     selectedFocusApp: PinnedFocusAppEntity?,
     activeSession: ActiveFocusSessionState,
+    focusHistoryCount: Int = 0,
     isTablet: Boolean,
     onSelectDuration: (Int) -> Unit,
     onStartFocusLock: () -> Unit,
@@ -112,36 +114,58 @@ fun ReadAndLockScreen(
     )
 
     if (isTablet) {
-        // --- TABLET 2-PANE ADAPTIVE CANONICAL LAYOUT (Xiaomi Pad 7 3:2 ratio) ---
+        // --- TABLET 2-PANE ADAPTIVE CANONICAL LAYOUT (Optimized for Xiaomi Pad 7 3:2 ratio) ---
         Row(
             modifier = modifier
                 .fillMaxSize()
-                .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(28.dp)
+                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp)
+                .testTag("read_and_lock_screen"),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Left Column: Pinned App + Duration Chips + Focus Stats (scrollable for all tablet aspect ratios)
+            // Left Pane: Pinned Reader App + 3x2 Duration Grid + Focus Telemetry
             Column(
                 modifier = Modifier
-                    .widthIn(min = 320.dp, max = 400.dp)
+                    .weight(0.46f)
                     .fillMaxHeight()
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Pinned App Card
+                // 1. Pinned Reader App Card
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     shape = RoundedCornerShape(32.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(32.dp))
+                        .clickable(enabled = !activeSession.isActive) { onOpenSelectFocusAppSheet() }
+                        .testTag("select_focus_app_card")
                 ) {
                     Column(
                         modifier = Modifier.padding(22.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "PINNED READER APP",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "PINNED READER APP",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = CircleShape
+                            ) {
+                                Text(
+                                    text = if (hasAppSelected) "SINGLE-APP ALLOW" else "UNSELECTED",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -149,8 +173,8 @@ fun ReadAndLockScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(RoundedCornerShape(16.dp))
+                                    .size(58.dp)
+                                    .clip(RoundedCornerShape(18.dp))
                                     .background(MaterialTheme.colorScheme.primaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -158,7 +182,7 @@ fun ReadAndLockScreen(
                                     RealAppIcon(
                                         packageName = appPackage,
                                         appName = appName,
-                                        modifier = Modifier.size(56.dp)
+                                        modifier = Modifier.size(58.dp)
                                     )
                                 } else {
                                     Icon(
@@ -173,7 +197,7 @@ fun ReadAndLockScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = appName,
-                                    style = MaterialTheme.typography.titleLarge,
+                                    style = MaterialTheme.typography.headlineMedium,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -209,7 +233,7 @@ fun ReadAndLockScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Change Reader App",
+                                        text = if (hasAppSelected) "Change Reader App" else "Select Installed App",
                                         style = MaterialTheme.typography.labelLarge
                                     )
                                 }
@@ -218,7 +242,7 @@ fun ReadAndLockScreen(
                     }
                 }
 
-                // Duration Selector Card (Tablet Left Column)
+                // 2. Symmetric 3x2 Duration Matrix Card (or Active Guard Status Card)
                 if (!activeSession.isActive) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -229,291 +253,303 @@ fun ReadAndLockScreen(
                             modifier = Modifier.padding(22.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Text(
-                                text = "SELECT DURATION",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            FlowRow(
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                FOCUS_DURATION_OPTIONS.forEach { mins ->
-                                    val selected = activeSession.selectedDurationMinutes == mins
-                                    val cornerRadius by animateDpAsState(
-                                        targetValue = if (selected) 16.dp else 26.dp,
-                                        animationSpec = spring(
-                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                            stiffness = Spring.StiffnessMedium
-                                        ),
-                                        label = "DurationMorphCorner"
-                                    )
-
-                                    Surface(
-                                        color = if (selected) MaterialTheme.colorScheme.tertiaryContainer
-                                        else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        shape = RoundedCornerShape(cornerRadius),
-                                        modifier = Modifier
-                                            .height(48.dp)
-                                            .clip(RoundedCornerShape(cornerRadius))
-                                            .clickable {
-                                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                onSelectDuration(mins)
-                                            }
-                                            .testTag("duration_pill_$mins")
-                                    ) {
-                                        Box(
-                                            modifier = Modifier.padding(horizontal = 18.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = formatMinutesClean(mins),
-                                                fontFamily = JetBrainsMonoFontFamily,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp,
-                                                color = if (selected) MaterialTheme.colorScheme.onTertiaryContainer
-                                                else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
+                                Text(
+                                    text = "SELECT DURATION",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = formatMinutesClean(activeSession.selectedDurationMinutes),
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
                             }
+
+                            DurationUniformGrid(
+                                selectedDurationMinutes = activeSession.selectedDurationMinutes,
+                                pillHeight = 52.dp,
+                                unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                onSelectDuration = { mins ->
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onSelectDuration(mins)
+                                }
+                            )
                         }
                     }
-                }
-
-                // Focus Stats Card
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = RoundedCornerShape(32.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                } else {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = RoundedCornerShape(32.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(ExpressiveCloverShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
+                        Column(
+                            modifier = Modifier.padding(22.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.HourglassTop,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Shield,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "STRICT INTERCEPTION ACTIVE",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                            }
                             Text(
-                                text = "Total Focus in $appName",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "${formatMinutesClean(selectedFocusApp?.totalFocusedMinutes ?: 0)} immersed reading",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = "All non-whitelisted apps outside $appName are blocked until the timer finishes or you solve a cognitive puzzle.",
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
+
+                // 3. Focus Telemetry Card
+                FocusTelemetryCard(
+                    appName = if (hasAppSelected) appName else "Focus Reader",
+                    totalFocusedMinutes = selectedFocusApp?.totalFocusedMinutes ?: 0,
+                    focusHistoryCount = focusHistoryCount
+                )
             }
 
-            // Right Column: Starburst Countdown Dial + Action Buttons
-            Column(
+            // Right Pane: Framed Expressive Focus Chamber Bento Card
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(36.dp),
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .weight(0.54f)
+                    .fillMaxHeight()
             ) {
-                Box(
+                Column(
                     modifier = Modifier
-                        .size(340.dp)
-                        .aspectRatio(1f),
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(horizontal = 28.dp, vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .rotate(if (activeSession.isActive) vesselRotation else 15f)
-                            .clip(GiantStarburstShape)
-                            .background(
-                                if (activeSession.isActive) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceContainerHigh
-                            )
-                    )
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(24.dp)
+                    // Chamber Top Status Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Text(
+                            text = "FOCUS CHAMBER",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Surface(
                             color = if (activeSession.isActive) MaterialTheme.colorScheme.tertiaryContainer
-                            else MaterialTheme.colorScheme.surfaceContainerLowest,
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
                             shape = CircleShape
                         ) {
                             Text(
-                                text = if (activeSession.isActive) "FOCUS LOCKED" else "TARGET SPRINT",
+                                text = if (activeSession.isActive) "LOCKED IN" else "READY TO LOCK",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (activeSession.isActive) MaterialTheme.colorScheme.onTertiaryContainer
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                             )
                         }
-
-                        Text(
-                            text = if (activeSession.isActive) {
-                                activeSession.formattedCountdown
-                            } else {
-                                formatMinutesClean(activeSession.selectedDurationMinutes)
-                            },
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = if (activeSession.isActive && activeSession.remainingSeconds >= 3600) 54.sp else 68.sp,
-                            lineHeight = 72.sp,
-                            letterSpacing = (-2.5).sp,
-                            color = if (activeSession.isActive) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center
-                        )
-
-                        Text(
-                            text = if (activeSession.isActive) "Distractions intercepted" else "Stay locked in $appName",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (activeSession.isActive) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(28.dp))
-
-                // Action Bar
-                if (activeSession.isActive) {
-                    Column(
-                        modifier = Modifier.widthIn(max = 440.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    // Center 12-Lobe Scalloped Starburst Countdown Vessel
+                    Box(
+                        modifier = Modifier
+                            .size(284.dp)
+                            .aspectRatio(1f),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .rotate(if (activeSession.isActive) vesselRotation else 15f)
+                                .clip(GiantStarburstShape)
+                                .background(
+                                    if (activeSession.isActive) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                        )
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(24.dp)
+                        ) {
+                            Surface(
+                                color = if (activeSession.isActive) MaterialTheme.colorScheme.tertiaryContainer
+                                else MaterialTheme.colorScheme.surfaceContainerLowest,
+                                shape = CircleShape
+                            ) {
+                                Text(
+                                    text = if (activeSession.isActive) "FOCUS LOCKED" else "TARGET SPRINT",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (activeSession.isActive) MaterialTheme.colorScheme.onTertiaryContainer
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                )
+                            }
+
+                            Text(
+                                text = if (activeSession.isActive) {
+                                    activeSession.formattedCountdown
+                                } else {
+                                    formatMinutesClean(activeSession.selectedDurationMinutes)
+                                },
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = if (activeSession.isActive && activeSession.remainingSeconds >= 3600) 50.sp else 64.sp,
+                                lineHeight = 68.sp,
+                                letterSpacing = (-2.0).sp,
+                                color = if (activeSession.isActive) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Text(
+                                text = if (activeSession.isActive) "Distractions intercepted"
+                                else if (hasAppSelected) "Stay locked in $appName"
+                                else "Choose an app to begin",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (activeSession.isActive) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    // Chamber Bottom Action Bar
+                    if (activeSession.isActive) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("active_lockdown_card"),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(64.dp)
+                                    .clip(CircleShape)
+                                    .clickable { onLaunchPinnedApp(activeSession.pinnedPackageName) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = "Open $appName",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onRequestQuitFocusEarly()
+                                    }
+                                    .testTag("emergency_unlock_sprint_button")
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.LockOpen,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Quit Early • Hard Puzzle",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    } else {
                         Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            color = MaterialTheme.colorScheme.primary,
                             shape = CircleShape,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(68.dp)
                                 .clip(CircleShape)
-                                .clickable { onLaunchPinnedApp(activeSession.pinnedPackageName) }
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "Open $appName",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
-                            }
-                        }
-
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shape = CircleShape,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .clip(CircleShape)
                                 .clickable {
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onRequestQuitFocusEarly()
+                                    onStartFocusLock()
                                 }
-                                .testTag("emergency_unlock_sprint_button")
+                                .testTag("start_reading_lockdown_button")
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.LockOpen,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Quit Early • Hard Puzzle",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .widthIn(max = 440.dp)
-                            .fillMaxWidth()
-                            .height(72.dp)
-                            .clip(CircleShape)
-                            .clickable {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onStartFocusLock()
-                            }
-                            .testTag("start_reading_lockdown_button")
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Box(
                                 modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(ExpressiveCloverShape)
-                                    .background(MaterialTheme.colorScheme.onPrimary),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxSize()
+                                    .padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Lock,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(ExpressiveCloverShape)
+                                        .background(MaterialTheme.colorScheme.onPrimary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                Text(
+                                    text = if (hasAppSelected) "Lock Into $appName" else "Choose App to Lock Into",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
+
+                                Spacer(modifier = Modifier.size(48.dp))
                             }
-
-                            Text(
-                                text = if (hasAppSelected) "Lock Into $appName" else "Choose App to Lock Into",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-
-                            Spacer(modifier = Modifier.size(52.dp))
                         }
                     }
                 }
@@ -525,10 +561,10 @@ fun ReadAndLockScreen(
             modifier = modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 112.dp)
+                .padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 112.dp)
                 .testTag("read_and_lock_screen"),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Pinned Focus App Pill Bar
             Surface(
@@ -626,7 +662,7 @@ fun ReadAndLockScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 320.dp)
+                    .widthIn(max = 300.dp)
                     .aspectRatio(1f),
                 contentAlignment = Alignment.Center
             ) {
@@ -668,8 +704,8 @@ fun ReadAndLockScreen(
                         },
                         fontFamily = JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.Bold,
-                        fontSize = if (activeSession.isActive && activeSession.remainingSeconds >= 3600) 52.sp else 64.sp,
-                        lineHeight = 68.sp,
+                        fontSize = if (activeSession.isActive && activeSession.remainingSeconds >= 3600) 50.sp else 62.sp,
+                        lineHeight = 66.sp,
                         letterSpacing = (-2.0).sp,
                         color = if (activeSession.isActive) MaterialTheme.colorScheme.onPrimaryContainer
                         else MaterialTheme.colorScheme.onSurface,
@@ -769,60 +805,24 @@ fun ReadAndLockScreen(
                 } else {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FOCUS_DURATION_OPTIONS.forEach { mins ->
-                                val selected = activeSession.selectedDurationMinutes == mins
-                                val cornerRadius by animateDpAsState(
-                                    targetValue = if (selected) 16.dp else 28.dp,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMedium
-                                    ),
-                                    label = "DurationMorphCorner"
-                                )
-
-                                Surface(
-                                    color = if (selected) MaterialTheme.colorScheme.tertiaryContainer
-                                    else MaterialTheme.colorScheme.surfaceContainerLow,
-                                    shape = RoundedCornerShape(cornerRadius),
-                                    modifier = Modifier
-                                        .height(50.dp)
-                                        .clip(RoundedCornerShape(cornerRadius))
-                                        .clickable {
-                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onSelectDuration(mins)
-                                        }
-                                        .testTag("duration_pill_$mins")
-                                ) {
-                                    Box(
-                                        modifier = Modifier.padding(horizontal = 22.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = formatMinutesClean(mins),
-                                            fontFamily = JetBrainsMonoFontFamily,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = if (selected) MaterialTheme.colorScheme.onTertiaryContainer
-                                            else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
+                        DurationUniformGrid(
+                            selectedDurationMinutes = activeSession.selectedDurationMinutes,
+                            pillHeight = 50.dp,
+                            unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            onSelectDuration = { mins ->
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelectDuration(mins)
                             }
-                        }
+                        )
 
                         Surface(
                             color = MaterialTheme.colorScheme.primary,
                             shape = CircleShape,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(74.dp)
+                                .height(72.dp)
                                 .clip(CircleShape)
                                 .clickable {
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -839,7 +839,7 @@ fun ReadAndLockScreen(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(52.dp)
+                                        .size(50.dp)
                                         .clip(ExpressiveCloverShape)
                                         .background(MaterialTheme.colorScheme.onPrimary),
                                     contentAlignment = Alignment.Center
@@ -860,11 +860,125 @@ fun ReadAndLockScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
 
-                                Spacer(modifier = Modifier.size(52.dp))
+                                Spacer(modifier = Modifier.size(50.dp))
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DurationUniformGrid(
+    selectedDurationMinutes: Int,
+    pillHeight: androidx.compose.ui.unit.Dp,
+    unselectedContainerColor: androidx.compose.ui.graphics.Color,
+    onSelectDuration: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FOCUS_DURATION_ROWS.forEach { rowOptions ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowOptions.forEach { mins ->
+                    val selected = selectedDurationMinutes == mins
+                    val cornerRadius by animateDpAsState(
+                        targetValue = if (selected) 16.dp else 26.dp,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "DurationMorphCorner"
+                    )
+
+                    Surface(
+                        color = if (selected) MaterialTheme.colorScheme.tertiaryContainer
+                        else unselectedContainerColor,
+                        shape = RoundedCornerShape(cornerRadius),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(pillHeight)
+                            .clip(RoundedCornerShape(cornerRadius))
+                            .clickable { onSelectDuration(mins) }
+                            .testTag("duration_pill_$mins")
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = formatMinutesClean(mins),
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = if (selected) MaterialTheme.colorScheme.onTertiaryContainer
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FocusTelemetryCard(
+    appName: String,
+    totalFocusedMinutes: Int,
+    focusHistoryCount: Int
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(32.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(ExpressiveCloverShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.HourglassTop,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Total Focus in $appName",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (focusHistoryCount > 0) {
+                        "${formatMinutesClean(totalFocusedMinutes)} immersed • $focusHistoryCount sessions"
+                    } else {
+                        "${formatMinutesClean(totalFocusedMinutes)} immersed reading"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
