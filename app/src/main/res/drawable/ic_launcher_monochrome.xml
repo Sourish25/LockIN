@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Single-layer monochrome stencil for Android 13+ Material You themed icons -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M41,47 L41,39 C41,31.82 46.82,26 54,26 C61.18,26 67,31.82 67,39 L67,47 L68,47 C73.52,47 77,50.48 77,56 L77,71 C77,76.52 73.52,80 68,80 L40,80 C34.48,80 31,76.52 31,71 L31,56 C31,50.48 34.48,47 40,47 L41,47 Z M48,47 L60,47 L60,39 C60,35.69 57.31,33 54,33 C50.69,33 48,35.69 48,39 L48,47 Z M54,56 C50.69,56 48,58.69 48,62 C48,64.22 49.21,66.15 51,67.19 L51,73 C51,74.1 51.9,75 53,75 L55,75 C56.1,75 57,74.1 57,73 L57,67.19 C58.79,66.15 60,64.22 60,62 C60,58.69 57.31,56 54,56 Z" />
+</vector>

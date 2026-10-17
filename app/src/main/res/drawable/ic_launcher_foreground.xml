@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Expressive 4-lobe Clover / Starburst Aura in Royal Purple (#673AB7) within safe zone -->
+    <path
+        android:fillColor="#673AB7"
+        android:pathData="M54,23 C61,23 66,28 69,33 C74,30 81,34 83,41 C85,48 80,54 80,54 C80,54 85,60 83,67 C81,74 74,78 69,75 C66,80 61,85 54,85 C47,85 42,80 39,75 C34,78 27,74 25,67 C23,60 28,54 28,54 C28,54 23,48 25,41 C27,34 34,30 39,33 C42,28 47,23 54,23 Z" />
+
+    <!-- Bold Heavy Shackle in Electric Lilac (#D8B9FF) -->
+    <path
+        android:fillColor="#D8B9FF"
+        android:pathData="M41,49 L41,39 C41,31.82 46.82,26 54,26 C61.18,26 67,31.82 67,39 L67,49 L60,49 L60,39 C60,35.69 57.31,33 54,33 C50.69,33 48,35.69 48,39 L48,49 Z" />
+
+    <!-- Expressive Squircle Lock Body in Acid Chartreuse (#D5FF59) -->
+    <path
+        android:fillColor="#D5FF59"
+        android:pathData="M40,46 L68,46 C73.52,46 77,49.48 77,55 L77,71 C77,76.52 73.52,80 68,80 L40,80 C34.48,80 31,76.52 31,71 L31,55 C31,49.48 34.48,46 40,46 Z" />
+
+    <!-- High-Contrast Keyhole Cutout in Deep Aubergine (#120F17) -->
+    <path
+        android:fillColor="#120F17"
+        android:pathData="M54,55 C57.31,55 60,57.69 60,61 C60,63.22 58.79,65.15 57,66.19 L57,73 C57,74.1 56.1,75 55,75 L53,75 C51.9,75 51,74.1 51,73 L51,66.19 C49.21,65.15 48,63.22 48,61 C48,57.69 50.69,55 54,55 Z" />
+</vector>
