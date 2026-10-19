@@ -38,9 +38,10 @@ LockIN includes a responsive two-pane canonical layout with a persistent navigat
 ## Architecture and Technical Highlights
 
 * **Zero-Allocation Hot Path Interception (`ChapterLockEnforcer`)**: Window state transitions in `AppBlockerAccessibilityService` are evaluated against an in-memory `ConcurrentHashMap` cache in under 0.02ms without blocking the main thread or performing disk I/O.
+* **Instant Native Window Overlay Barrier (`LockWindowOverlayManager`)**: Uses `TYPE_ACCESSIBILITY_OVERLAY` and `TYPE_APPLICATION_OVERLAY` directly on `WindowManager` to cover restricted apps (such as YouTube) the instant a daily limit expires or an unapproved app is opened during Focus Lock, bypassing Android 10 to 15 background activity start delays.
+* **Live Foreground Session Calculation (`SystemAppInspector`)**: Computes exact daily foreground screen time since local midnight using `UsageEvents` (`ACTIVITY_RESUMED` and `ACTIVITY_PAUSED`), including the currently active open session before the user closes the app.
 * **Self-Sufficient Background Enforcement**: Both `AppBlockerAccessibilityService` and `AppMonitorService` synchronize state directly with the local Room SQLite database (`lockin_v1_clean.db`). Rules and active sessions remain enforced even if the UI activity is swiped away from recents.
 * **Reboot and Update Survivability (`BootReceiver`)**: Listens for `ACTION_BOOT_COMPLETED`, `QUICKBOOT_POWERON`, and `ACTION_MY_PACKAGE_REPLACED` to restore active timers and background guards automatically after a device restart.
-* **Android 10 to 15 Background Activity Start Compliance**: Combines `GLOBAL_ACTION_HOME` with a high-priority `fullScreenIntent` notification channel so the friction puzzle shield appears reliably across modern Android versions.
 * **No Preset or Mock Data**: Fresh installations start with an empty database and inspect only real launchable packages installed on the user's device via `PackageManager`.
 
 ## Releases and ABI Architecture Downloads

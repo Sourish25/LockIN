@@ -12,7 +12,8 @@ import com.example.data.FocusActiveConfigEntity
 import com.example.data.FocusHistoryRecordEntity
 import com.example.data.PinnedFocusAppEntity
 import com.example.service.AppMonitorService
-import com.example.service.ChapterLockEnforcer
+import com.example.service.LockNotificationManager
+import com.example.service.LockWindowOverlayManager
 import kotlin.random.Random
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -52,6 +53,7 @@ data class FrictionChallengeState(
     val reason: FrictionReason,
     val targetAppName: String? = null,
     val targetPackageName: String? = null,
+    val wasTriggeredByInterception: Boolean = false,
     val mode: ChallengeMode = ChallengeMode.MEMORY_GRID,
     val patternSequence: List<Int> = emptyList(),
     val userClickedSequence: List<Int> = emptyList(),
@@ -117,12 +119,20 @@ data class ChapterLockUiState(
     val hasUsageStatsPermission: Boolean = false,
     val hasAccessibilityPermission: Boolean = false,
     val hasOverlayPermission: Boolean = false,
+    val hasNotificationPermission: Boolean = true,
     val isIgnoringBatteryOptimizations: Boolean = false,
     val isXiaomiDevice: Boolean = false,
     val showPermissionsSheet: Boolean = false
 ) {
     val selectedFocusApp: PinnedFocusAppEntity?
         get() = pinnedFocusApps.firstOrNull { it.isSelected } ?: pinnedFocusApps.firstOrNull()
+
+    val allCorePermissionsGranted: Boolean
+        get() = hasUsageStatsPermission && hasAccessibilityPermission && hasOverlayPermission
+
+    val missingPermissionsCount: Int
+        get() = listOf(hasUsageStatsPermission, hasAccessibilityPermission, hasOverlayPermission)
+            .count { !it }
 }
 
 private data class InternalControlState(
@@ -136,6 +146,7 @@ private data class InternalControlState(
     val hasUsageStatsPermission: Boolean = false,
     val hasAccessibilityPermission: Boolean = false,
     val hasOverlayPermission: Boolean = false,
+    val hasNotificationPermission: Boolean = true,
     val isIgnoringBatteryOptimizations: Boolean = false,
     val isXiaomiDevice: Boolean = false
 )
@@ -199,6 +210,7 @@ class ChapterLockViewModel(
             hasUsageStatsPermission = ctrl.hasUsageStatsPermission,
             hasAccessibilityPermission = ctrl.hasAccessibilityPermission,
             hasOverlayPermission = ctrl.hasOverlayPermission,
+            hasNotificationPermission = ctrl.hasNotificationPermission,
             isIgnoringBatteryOptimizations = ctrl.isIgnoringBatteryOptimizations,
             isXiaomiDevice = ctrl.isXiaomiDevice,
             showPermissionsSheet = ctrl.showPermissionsSheet
@@ -219,13 +231,14 @@ class ChapterLockViewModel(
 
     fun refreshPermissionsAndApps() {
         viewModelScope.launch {
-            val discovered = repository.discoverCandidateApps()
             val hasUsage = repository.hasUsageStatsPermission()
             val hasAccess = repository.hasAccessibilityPermission()
             val hasOverlay = repository.hasOverlayPermission()
+            val hasNotif = repository.hasNotificationPermission()
             val isIgnoringBattery = repository.isIgnoringBatteryOptimizations()
             val isXiaomi = repository.isXiaomiDevice()
             repository.syncSystemUsageStats()
+            val discovered = repository.discoverCandidateApps()
 
             controlState.update {
                 it.copy(
@@ -233,6 +246,7 @@ class ChapterLockViewModel(
                     hasUsageStatsPermission = hasUsage,
                     hasAccessibilityPermission = hasAccess,
                     hasOverlayPermission = hasOverlay,
+                    hasNotificationPermission = hasNotif,
                     isIgnoringBatteryOptimizations = isIgnoringBattery,
                     isXiaomiDevice = isXiaomi
                 )
@@ -243,20 +257,25 @@ class ChapterLockViewModel(
     private fun startPeriodicTicker() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
+            var tick = 0L
             while (true) {
                 delay(1000L)
+                tick++
                 val config = uiState.value.focusConfig
                 if (config != null && config.isActive) {
                     if (!config.isStillActive()) {
-                        // Focus session finished naturally
                         repository.endFocusLockSession(earlyQuit = false)
                     }
+                }
+                if (tick % 3L == 0L) {
+                    repository.syncSystemUsageStats()
                 }
             }
         }
     }
 
     fun handleInterception(packageName: String, reason: String) {
+        LockWindowOverlayManager.dismiss()
         val appName = uiState.value.appRules.firstOrNull { it.packageName == packageName }?.appName
             ?: uiState.value.discoveredApps.firstOrNull { it.packageName == packageName }?.appName
             ?: packageName
@@ -270,16 +289,19 @@ class ChapterLockViewModel(
         openFrictionChallenge(
             reason = frictionReason,
             targetAppName = appName,
-            targetPackageName = packageName
+            targetPackageName = packageName,
+            wasTriggeredByInterception = true
         )
     }
 
     fun buildUsageAccessSettingsIntent(): Intent = repository.createUsageAccessIntent()
     fun buildAccessibilitySettingsIntent(): Intent = repository.createAccessibilitySettingsIntent()
     fun buildOverlaySettingsIntent(): Intent = repository.createOverlaySettingsIntent()
+    fun buildNotificationSettingsIntent(): Intent = repository.createNotificationSettingsIntent()
     fun buildBatteryOptimizationSettingsIntent(): Intent = repository.createBatteryOptimizationIntent()
     fun buildXiaomiAutostartIntent(): Intent? = repository.createXiaomiAutostartIntent()
     fun buildLaunchAppIntent(packageName: String): Intent? = repository.createLaunchIntent(packageName)
+    fun buildHomeScreenIntent(): Intent = repository.createHomeScreenIntent()
 
     fun setShowPermissionsSheet(visible: Boolean) {
         controlState.update { it.copy(showPermissionsSheet = visible) }
@@ -298,18 +320,64 @@ class ChapterLockViewModel(
     }
 
     fun startFocusLock(context: Context) {
-        val currentPkg = uiState.value.selectedFocusApp?.packageName
-            ?: uiState.value.activeSession.pinnedPackageName
+        val state = uiState.value
+        val selected = state.selectedFocusApp
+        val currentPkg = selected?.packageName?.takeIf { it.isNotBlank() }
+            ?: state.activeSession.pinnedPackageName
+        val currentName = selected?.appName?.takeIf { it.isNotBlank() }
+            ?: state.activeSession.pinnedAppName
+        val currentSub = selected?.subtitle ?: "Installed Focus App"
+
         if (currentPkg.isBlank()) {
             setShowSelectFocusAppSheet(true)
             return
         }
+
+        if (!state.hasAccessibilityPermission && !state.hasUsageStatsPermission) {
+            setShowPermissionsSheet(true)
+            return
+        }
+
         viewModelScope.launch {
-            val started = repository.startFocusLockSession()
+            val started = repository.startFocusLockSession(
+                fallbackPackageName = currentPkg,
+                fallbackAppName = currentName,
+                fallbackSubtitle = currentSub
+            )
             if (started != null) {
                 AppMonitorService.start(context)
+                LockNotificationManager.refreshForegroundNotification(context)
+                // Launch the pinned app directly so the user is immediately locked into it
+                try {
+                    repository.createLaunchIntent(started.pinnedPackageName)?.let { launchIntent ->
+                        context.startActivity(launchIntent)
+                    }
+                } catch (_: Exception) {
+                }
             } else {
                 setShowSelectFocusAppSheet(true)
+            }
+        }
+    }
+
+    fun extendActiveFocusLock(context: Context, extraMinutes: Int = 15) {
+        viewModelScope.launch {
+            val updated = repository.extendActiveFocusSession(extraMinutes)
+            if (updated != null) {
+                LockNotificationManager.refreshForegroundNotification(context)
+            }
+        }
+    }
+
+    fun launchPinnedFocusApp(context: Context) {
+        val pkg = uiState.value.activeSession.pinnedPackageName
+            .ifBlank { uiState.value.selectedFocusApp?.packageName.orEmpty() }
+        if (pkg.isNotBlank()) {
+            try {
+                repository.createLaunchIntent(pkg)?.let { launchIntent ->
+                    context.startActivity(launchIntent)
+                }
+            } catch (_: Exception) {
             }
         }
     }
@@ -319,7 +387,8 @@ class ChapterLockViewModel(
         openFrictionChallenge(
             reason = FrictionReason.QUIT_FOCUS_LOCK_EARLY,
             targetAppName = session.pinnedAppName,
-            targetPackageName = session.pinnedPackageName
+            targetPackageName = session.pinnedPackageName,
+            wasTriggeredByInterception = false
         )
     }
 
@@ -349,7 +418,8 @@ class ChapterLockViewModel(
             openFrictionChallenge(
                 reason = FrictionReason.EDIT_LOCKED_APP_SETTINGS,
                 targetAppName = rule.appName,
-                targetPackageName = rule.packageName
+                targetPackageName = rule.packageName,
+                wasTriggeredByInterception = false
             )
         } else {
             controlState.update { it.copy(editingRule = rule) }
@@ -391,7 +461,13 @@ class ChapterLockViewModel(
                 category = category,
                 dailyLimitMinutes = dailyLimitMinutes
             )
-            controlState.update { it.copy(showAddAppSheet = false) }
+            val updatedDiscovered = repository.discoverCandidateApps()
+            controlState.update {
+                it.copy(
+                    showAddAppSheet = false,
+                    discoveredApps = updatedDiscovered
+                )
+            }
         }
     }
 
@@ -400,7 +476,8 @@ class ChapterLockViewModel(
     fun openFrictionChallenge(
         reason: FrictionReason,
         targetAppName: String?,
-        targetPackageName: String?
+        targetPackageName: String?,
+        wasTriggeredByInterception: Boolean = false
     ) {
         val sequence = (0 until 16).shuffled().take(5)
         val mathChain = generateHardMathChain()
@@ -412,6 +489,7 @@ class ChapterLockViewModel(
                     reason = reason,
                     targetAppName = targetAppName,
                     targetPackageName = targetPackageName,
+                    wasTriggeredByInterception = wasTriggeredByInterception,
                     mode = ChallengeMode.MEMORY_GRID,
                     patternSequence = sequence,
                     userClickedSequence = emptyList(),
@@ -569,7 +647,7 @@ class ChapterLockViewModel(
                         mathSteps = freshChain,
                         currentMathStepIndex = 0,
                         mathInput = "",
-                        mathErrorMessage = "Incorrect — reset to Step 1."
+                        mathErrorMessage = "Incorrect. Reset to Step 1."
                     )
                 )
             }
@@ -600,6 +678,7 @@ class ChapterLockViewModel(
 
     private fun fulfillFrictionChallenge() {
         patternRevealJob?.cancel()
+        LockWindowOverlayManager.dismiss()
         val challenge = controlState.value.activeChallenge ?: return
         controlState.update { it.copy(activeChallenge = null) }
 
@@ -627,9 +706,31 @@ class ChapterLockViewModel(
         }
     }
 
-    fun dismissFrictionChallengeKeepLocked() {
+    fun dismissFrictionChallengeKeepLocked(context: Context? = null) {
         patternRevealJob?.cancel()
+        LockWindowOverlayManager.dismiss()
+        val currentChallenge = controlState.value.activeChallenge
         controlState.update { it.copy(activeChallenge = null) }
+
+        if (context != null && currentChallenge?.wasTriggeredByInterception == true) {
+            if (currentChallenge.reason == FrictionReason.QUIT_FOCUS_LOCK_EARLY) {
+                val pinnedPkg = uiState.value.activeSession.pinnedPackageName
+                if (pinnedPkg.isNotBlank()) {
+                    val launchPinned = repository.createLaunchIntent(pinnedPkg)
+                    if (launchPinned != null) {
+                        try {
+                            context.startActivity(launchPinned)
+                            return
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
+            try {
+                context.startActivity(repository.createHomeScreenIntent())
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun generateHardMathChain(): List<MathStepProblem> {

@@ -3,16 +3,21 @@ package com.example
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ViewRootForTest
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.AppTimerRuleEntity
+import com.example.data.DiscoveredDeviceApp
 import com.example.data.PinnedFocusAppEntity
-import com.example.data.SystemAppInspector
 import com.example.service.BootReceiver
 import com.example.service.ChapterLockEnforcer
 import com.example.service.InterceptReason
@@ -26,8 +31,6 @@ import com.example.viewmodel.ChallengeMode
 import com.example.viewmodel.FrictionChallengeState
 import com.example.viewmodel.FrictionReason
 import com.example.viewmodel.MathStepProblem
-import android.graphics.Canvas
-import androidx.compose.ui.platform.ViewRootForTest
 import java.io.File
 import java.io.FileOutputStream
 import org.junit.Assert.assertEquals
@@ -76,15 +79,15 @@ class ExampleRobolectricTest {
 
     @Test
     fun `ChapterLockEnforcer evaluates packages accurately without disk or DB overhead`() {
-        val instagramRule = AppTimerRuleEntity(
-            packageName = "com.instagram.android",
-            appName = "Instagram",
-            category = "Social",
-            dailyLimitMinutes = 60,
-            usedMinutesToday = 60,
+        val youtubeRule = AppTimerRuleEntity(
+            packageName = "com.google.android.youtube",
+            appName = "YouTube",
+            category = "Video",
+            dailyLimitMinutes = 30,
+            usedMinutesToday = 35,
             blockDuringReading = true
         )
-        ChapterLockEnforcer.syncRules(listOf(instagramRule))
+        ChapterLockEnforcer.syncRules(listOf(youtubeRule))
         ChapterLockEnforcer.updateFocusLockState(
             active = false,
             pinnedPackage = null,
@@ -98,9 +101,9 @@ class ExampleRobolectricTest {
         val systemUiDecision = ChapterLockEnforcer.evaluatePackage("com.android.systemui", "com.example")
         assertNull("SystemUI must never be intercepted", systemUiDecision)
 
-        val igDecision = ChapterLockEnforcer.evaluatePackage("com.instagram.android", "com.example")
-        assertNotNull(igDecision)
-        assertEquals(InterceptReason.DAILY_LIMIT_EXHAUSTED, igDecision?.reason)
+        val ytDecision = ChapterLockEnforcer.evaluatePackage("com.google.android.youtube", "com.example")
+        assertNotNull(ytDecision)
+        assertEquals(InterceptReason.DAILY_LIMIT_EXHAUSTED, ytDecision?.reason)
     }
 
     @Test
@@ -140,6 +143,61 @@ class ExampleRobolectricTest {
     }
 
     @Test
+    fun `permissions card completely disappears from home screen once all 3 permissions are granted`() {
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                AppVaultScreen(
+                    appRules = emptyList(),
+                    isFocusSessionActive = false,
+                    hasUsageStatsPermission = true,
+                    hasAccessibilityPermission = true,
+                    hasOverlayPermission = true,
+                    isTablet = false,
+                    onOpenUsageAccessSettings = {},
+                    onOpenAccessibilitySettings = {},
+                    onOpenOverlaySettings = {},
+                    onOpenPermissionsSheet = {},
+                    onTapAppRule = {},
+                    onRequestUnlockApp = {},
+                    onOpenAddAppSheet = {}
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("missing_permissions_card").assertDoesNotExist()
+    }
+
+    @Test
+    fun `only ungranted permissions are shown when permissions are partially granted`() {
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                Box(modifier = Modifier.size(width = 960.dp, height = 640.dp)) {
+                    AppVaultScreen(
+                        appRules = emptyList(),
+                        isFocusSessionActive = false,
+                        hasUsageStatsPermission = true,
+                        hasAccessibilityPermission = true,
+                        hasOverlayPermission = false,
+                        isTablet = true,
+                        onOpenUsageAccessSettings = {},
+                        onOpenAccessibilitySettings = {},
+                        onOpenOverlaySettings = {},
+                        onOpenPermissionsSheet = {},
+                        onTapAppRule = {},
+                        onRequestUnlockApp = {},
+                        onOpenAddAppSheet = {}
+                    )
+                }
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("missing_permissions_card").assertExists()
+        composeTestRule.onNodeWithText("Display Over Other Apps").assertExists()
+        composeTestRule.onNodeWithText("Usage Access").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Accessibility Blocker").assertDoesNotExist()
+    }
+
+    @Test
     fun `BootReceiver handles broadcast without crashing`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val receiver = BootReceiver()
@@ -148,21 +206,74 @@ class ExampleRobolectricTest {
     }
 
     @Test
+    fun `LockNotificationManager builds live chronometer notification during Focus Lock and summary when idle`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        ChapterLockEnforcer.updateFocusLockState(
+            active = true,
+            pinnedPackage = "com.flyersoft.moonreader",
+            pinnedName = "Moon+ Reader",
+            endTimeMs = System.currentTimeMillis() + 30 * 60_000L
+        )
+        val focusNotif = com.example.service.LockNotificationManager.buildForegroundServiceNotification(context)
+        assertNotNull(focusNotif)
+        assertEquals(3, focusNotif.actions?.size ?: 0)
+
+        ChapterLockEnforcer.updateFocusLockState(
+            active = false,
+            pinnedPackage = null,
+            pinnedName = "",
+            endTimeMs = 0L
+        )
+        val idleNotif = com.example.service.LockNotificationManager.buildForegroundServiceNotification(context)
+        assertNotNull(idleNotif)
+        assertEquals(2, idleNotif.actions?.size ?: 0)
+    }
+
+    @Test
+    fun `connected focus session banner appears on AppVaultScreen when Focus Lock is active`() {
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                AppVaultScreen(
+                    appRules = emptyList(),
+                    isFocusSessionActive = true,
+                    activeFocusAppName = "Moon+ Reader",
+                    activeFocusPackageName = "com.flyersoft.moonreader",
+                    activeFocusCountdown = "42:15",
+                    hasUsageStatsPermission = true,
+                    hasAccessibilityPermission = true,
+                    hasOverlayPermission = true,
+                    isTablet = false,
+                    onOpenUsageAccessSettings = {},
+                    onOpenAccessibilitySettings = {},
+                    onOpenOverlaySettings = {},
+                    onOpenPermissionsSheet = {},
+                    onTapAppRule = {},
+                    onRequestUnlockApp = {},
+                    onOpenAddAppSheet = {}
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("connected_focus_session_banner").assertIsDisplayed()
+        composeTestRule.onNodeWithText("42:15").assertIsDisplayed()
+    }
+
+    @Test
     @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun `capture real screenshot of AppLimits screen`() {
         composeTestRule.mainClock.autoAdvance = false
         val sampleRules = listOf(
             AppTimerRuleEntity(
-                packageName = "com.instagram.android",
-                appName = "Instagram",
-                category = "Social",
+                packageName = "com.google.android.youtube",
+                appName = "YouTube",
+                category = "Video",
                 dailyLimitMinutes = 45,
                 usedMinutesToday = 45
             ),
             AppTimerRuleEntity(
-                packageName = "com.google.android.youtube",
-                appName = "YouTube",
-                category = "Video",
+                packageName = "com.instagram.android",
+                appName = "Instagram",
+                category = "Social",
                 dailyLimitMinutes = 60,
                 usedMinutesToday = 32
             ),
@@ -307,7 +418,6 @@ class ExampleRobolectricTest {
                     ) {
                         ExpressiveNavigationRail(
                             currentTab = AppTab.FOCUS_LOCK,
-                            activeFocusRunning = false,
                             onSelectTab = {}
                         )
                         androidx.compose.foundation.layout.Column(
@@ -315,7 +425,7 @@ class ExampleRobolectricTest {
                         ) {
                             ExpressiveTopBar(
                                 currentTab = AppTab.FOCUS_LOCK,
-                                activeFocusRunning = false,
+                                allPermissionsGranted = true,
                                 useDynamicWallpaper = false,
                                 isTablet = true,
                                 onToggleWallpaperTheme = {}
@@ -346,16 +456,16 @@ class ExampleRobolectricTest {
         composeTestRule.mainClock.autoAdvance = false
         val rules = listOf(
             AppTimerRuleEntity(
-                packageName = "com.instagram.android",
-                appName = "Instagram",
-                category = "Social",
+                packageName = "com.google.android.youtube",
+                appName = "YouTube",
+                category = "Video",
                 dailyLimitMinutes = 45,
                 usedMinutesToday = 45
             ),
             AppTimerRuleEntity(
-                packageName = "com.google.android.youtube",
-                appName = "YouTube",
-                category = "Video",
+                packageName = "com.instagram.android",
+                appName = "Instagram",
+                category = "Social",
                 dailyLimitMinutes = 60,
                 usedMinutesToday = 32
             ),
@@ -367,6 +477,20 @@ class ExampleRobolectricTest {
                 usedMinutesToday = 12
             )
         )
+        val discovered = listOf(
+            DiscoveredDeviceApp(
+                packageName = "com.reddit.frontpage",
+                appName = "Reddit",
+                category = "Forums",
+                usedMinutesToday = 24
+            ),
+            DiscoveredDeviceApp(
+                packageName = "com.twitter.android",
+                appName = "X",
+                category = "Social",
+                usedMinutesToday = 18
+            )
+        )
 
         composeTestRule.setContent {
             MyApplicationTheme(darkTheme = true, dynamicColor = false) {
@@ -376,7 +500,6 @@ class ExampleRobolectricTest {
                     ) {
                         ExpressiveNavigationRail(
                             currentTab = AppTab.APP_LIMITS,
-                            activeFocusRunning = false,
                             onSelectTab = {}
                         )
                         androidx.compose.foundation.layout.Column(
@@ -384,13 +507,14 @@ class ExampleRobolectricTest {
                         ) {
                             ExpressiveTopBar(
                                 currentTab = AppTab.APP_LIMITS,
-                                activeFocusRunning = false,
+                                allPermissionsGranted = true,
                                 useDynamicWallpaper = false,
                                 isTablet = true,
                                 onToggleWallpaperTheme = {}
                             )
                             AppVaultScreen(
                                 appRules = rules,
+                                discoveredApps = discovered,
                                 isFocusSessionActive = false,
                                 hasUsageStatsPermission = true,
                                 hasAccessibilityPermission = true,

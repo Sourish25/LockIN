@@ -1,7 +1,7 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,8 +57,10 @@ import com.example.data.PinnedFocusAppEntity
 import com.example.data.RealAppIcon
 import com.example.data.formatMinutesClean
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LockInMotion
+import com.example.ui.theme.expressiveClickable
 
-private val DAILY_LIMIT_PRESETS = listOf(15, 30, 45, 60, 90, 120, 180)
+private val DAILY_LIMIT_PRESETS = listOf(1, 5, 10, 15, 30, 45, 60, 90, 120, 180)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -71,7 +73,7 @@ fun EditAppLimitBottomSheet(
     if (rule == null) return
 
     var selectedMinutes by remember(rule.dailyLimitMinutes) {
-        mutableIntStateOf(rule.dailyLimitMinutes.coerceAtLeast(15))
+        mutableIntStateOf(rule.dailyLimitMinutes.coerceAtLeast(1))
     }
 
     ModalBottomSheet(
@@ -85,7 +87,7 @@ fun EditAppLimitBottomSheet(
                 .fillMaxWidth()
                 .widthIn(max = 560.dp)
                 .padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -127,27 +129,39 @@ fun EditAppLimitBottomSheet(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     shape = CircleShape
                 ) {
-                    Text(
-                        text = formatMinutesClean(selectedMinutes),
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-                    )
+                    AnimatedContent(
+                        targetState = selectedMinutes,
+                        transitionSpec = { LockInMotion.numericCounterTransition() },
+                        label = "edit_limit_badge"
+                    ) { mins ->
+                        Text(
+                            text = formatMinutesClean(mins),
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                        )
+                    }
                 }
             }
 
+            FineTuneMinutesRow(
+                selectedMinutes = selectedMinutes,
+                usedMinutesToday = rule.usedMinutesToday,
+                onAdjust = { newMins -> selectedMinutes = newMins.coerceIn(1, 360) }
+            )
+
             Text(
-                text = "Daily time limit",
+                text = "Daily time limit presets",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 DAILY_LIMIT_PRESETS.forEach { mins ->
                     val chosen = selectedMinutes == mins
@@ -156,12 +170,12 @@ fun EditAppLimitBottomSheet(
                         else MaterialTheme.colorScheme.surfaceContainerHigh,
                         shape = CircleShape,
                         modifier = Modifier
-                            .height(48.dp)
+                            .height(44.dp)
                             .clip(CircleShape)
-                            .clickable { selectedMinutes = mins }
+                            .expressiveClickable { selectedMinutes = mins }
                     ) {
                         Box(
-                            modifier = Modifier.padding(horizontal = 20.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -215,6 +229,65 @@ fun EditAppLimitBottomSheet(
     }
 }
 
+@Composable
+private fun FineTuneMinutesRow(
+    selectedMinutes: Int,
+    usedMinutesToday: Int,
+    onAdjust: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        listOf(-5 to "-5m", -1 to "-1m", 1 to "+1m", 5 to "+5m").forEach { (delta, label) ->
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = CircleShape,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(CircleShape)
+                    .expressiveClickable { onAdjust(selectedMinutes + delta) }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = label,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+
+        if (usedMinutesToday > 0) {
+            Surface(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                shape = CircleShape,
+                modifier = Modifier
+                    .height(40.dp)
+                    .clip(CircleShape)
+                    .expressiveClickable { onAdjust(usedMinutesToday.coerceAtLeast(1)) }
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Lock (${formatMinutesClean(usedMinutesToday)})",
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddAppTimerBottomSheet(
@@ -258,13 +331,39 @@ fun AddAppTimerBottomSheet(
                 .fillMaxWidth()
                 .widthIn(max = 560.dp)
                 .padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                text = "Add App Limit",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Add App Limit",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = CircleShape
+                ) {
+                    AnimatedContent(
+                        targetState = selectedMinutes,
+                        transitionSpec = { LockInMotion.numericCounterTransition() },
+                        label = "add_limit_badge"
+                    ) { mins ->
+                        Text(
+                            text = formatMinutesClean(mins),
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
 
             // Search Bar for installed apps
             OutlinedTextField(
@@ -294,7 +393,7 @@ fun AddAppTimerBottomSheet(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 240.dp)
+                    .heightIn(max = 220.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainer)
                     .padding(8.dp),
@@ -309,7 +408,7 @@ fun AddAppTimerBottomSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(18.dp))
-                            .clickable { selectedPackage = app }
+                            .expressiveClickable { selectedPackage = app }
                     ) {
                         Row(
                             modifier = Modifier
@@ -343,7 +442,11 @@ fun AddAppTimerBottomSheet(
                                         else MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = if (app.isInstalledOnDevice) "Installed • ${app.category}" else app.category,
+                                        text = if (app.usedMinutesToday > 0) {
+                                            "${formatMinutesClean(app.usedMinutesToday)} used today • ${app.category}"
+                                        } else {
+                                            app.category
+                                        },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                         else MaterialTheme.colorScheme.onSurfaceVariant
@@ -363,10 +466,10 @@ fun AddAppTimerBottomSheet(
                 }
             }
 
-            Text(
-                text = "Daily allowance",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            FineTuneMinutesRow(
+                selectedMinutes = selectedMinutes,
+                usedMinutesToday = selectedPackage?.usedMinutesToday ?: 0,
+                onAdjust = { newMins -> selectedMinutes = newMins.coerceIn(1, 360) }
             )
 
             FlowRow(
@@ -381,13 +484,13 @@ fun AddAppTimerBottomSheet(
                         else MaterialTheme.colorScheme.surfaceContainerHigh,
                         shape = CircleShape,
                         modifier = Modifier
-                            .height(44.dp)
+                            .height(42.dp)
                             .clip(CircleShape)
-                            .clickable { selectedMinutes = mins }
+                            .expressiveClickable { selectedMinutes = mins }
                             .testTag("preset_minutes_$mins")
                     ) {
                         Box(
-                            modifier = Modifier.padding(horizontal = 18.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -449,25 +552,25 @@ fun SelectFocusAppBottomSheet(
     var searchQuery by remember { mutableStateOf("") }
 
     val allReaderCandidates = remember(pinnedFocusApps, discoveredApps, searchQuery) {
-        val existingPkg = pinnedFocusApps.map { it.packageName }.toSet()
-        val extraInstalled = discoveredApps.filter {
-            it.isInstalledOnDevice && it.packageName !in existingPkg
-        }.map {
-            PinnedFocusAppEntity(
-                packageName = it.packageName,
-                appName = it.appName,
-                subtitle = if (it.isReaderApp) "Installed Reader" else "Installed App",
-                isSelected = false,
-                isInstalled = true
-            )
-        }
-        val combined = pinnedFocusApps + extraInstalled
+        val pinnedPkgs = pinnedFocusApps.map { it.packageName }.toSet()
+        val extraReaders = discoveredApps
+            .filter { it.packageName !in pinnedPkgs }
+            .map {
+                PinnedFocusAppEntity(
+                    packageName = it.packageName,
+                    appName = it.appName,
+                    subtitle = if (it.isReaderApp) "Installed Reader App" else it.category,
+                    isSelected = false,
+                    isInstalled = true
+                )
+            }
+        val combined = pinnedFocusApps + extraReaders
         if (searchQuery.isBlank()) {
-            combined.sortedWith(compareByDescending<PinnedFocusAppEntity> { it.isSelected }.thenByDescending { it.isInstalled })
+            combined
         } else {
             combined.filter {
                 it.appName.contains(searchQuery, ignoreCase = true) ||
-                        it.subtitle.contains(searchQuery, ignoreCase = true)
+                        it.packageName.contains(searchQuery, ignoreCase = true)
             }
         }
     }
@@ -487,12 +590,12 @@ fun SelectFocusAppBottomSheet(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Choose Reader App",
+                    text = "Select Pinned Focus App",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Select your Light Novel Reader (Moon+, Mihon, Kindle, ReadEra) to lock into.",
+                    text = "During Focus Lock, only this app is allowed in the foreground. Switching to any other app triggers the lock barrier.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -501,9 +604,16 @@ fun SelectFocusAppBottomSheet(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search reader or app name...") },
+                placeholder = { Text("Search installed readers or apps...") },
                 leadingIcon = {
                     Icon(imageVector = Icons.Filled.Search, contentDescription = null)
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(imageVector = Icons.Filled.Clear, contentDescription = "Clear")
+                        }
+                    }
                 },
                 singleLine = true,
                 shape = RoundedCornerShape(20.dp),
@@ -528,7 +638,7 @@ fun SelectFocusAppBottomSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(22.dp))
-                            .clickable {
+                            .expressiveClickable {
                                 if (pinnedFocusApps.any { it.packageName == app.packageName }) {
                                     onSelectFocusApp(app.packageName)
                                 } else {
@@ -600,12 +710,14 @@ fun SystemPermissionsBottomSheet(
     hasUsageAccess: Boolean,
     hasAccessibility: Boolean,
     hasOverlay: Boolean,
+    hasNotifications: Boolean = true,
     isBatteryOptimizedExempt: Boolean,
     isXiaomi: Boolean,
     onDismiss: () -> Unit,
     onOpenUsageAccess: () -> Unit,
     onOpenAccessibility: () -> Unit,
     onOpenOverlay: () -> Unit,
+    onOpenNotifications: (() -> Unit)? = null,
     onOpenBatteryOptimization: () -> Unit,
     onOpenXiaomiAutostart: (() -> Unit)?
 ) {
@@ -622,7 +734,7 @@ fun SystemPermissionsBottomSheet(
                 .fillMaxWidth()
                 .widthIn(max = 560.dp)
                 .padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -631,7 +743,7 @@ fun SystemPermissionsBottomSheet(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Grant these Android permissions to ensure LockIN stays active in the background and intercepts apps immediately.",
+                    text = "Grant these Android permissions to ensure LockIN stays active in the background, sends timer alerts, and intercepts apps immediately.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -648,7 +760,7 @@ fun SystemPermissionsBottomSheet(
             // 2. Usage Stats
             PermissionRowCard(
                 title = "Usage Access",
-                subtitle = "Calculates exact daily app screen time minutes",
+                subtitle = "Calculates live daily app screen time minutes",
                 isGranted = hasUsageAccess,
                 onGrantClick = onOpenUsageAccess
             )
@@ -656,12 +768,22 @@ fun SystemPermissionsBottomSheet(
             // 3. Draw Over Other Apps
             PermissionRowCard(
                 title = "Display Over Other Apps",
-                subtitle = "Permits instant Friction Shield popup on Android 10+",
+                subtitle = "Renders instant LockIN barrier over blocked apps",
                 isGranted = hasOverlay,
                 onGrantClick = onOpenOverlay
             )
 
-            // 4. Battery Saver Exemption
+            // 4. Notifications (Live Focus Timer & 5m Warnings)
+            if (onOpenNotifications != null) {
+                PermissionRowCard(
+                    title = "Timer & Limit Notifications",
+                    subtitle = "Live Focus Lock chronometer & 5m remaining alerts",
+                    isGranted = hasNotifications,
+                    onGrantClick = onOpenNotifications
+                )
+            }
+
+            // 5. Battery Saver Exemption
             PermissionRowCard(
                 title = "Unrestricted Battery",
                 subtitle = "Prevents OS from killing background monitoring",
@@ -669,7 +791,7 @@ fun SystemPermissionsBottomSheet(
                 onGrantClick = onOpenBatteryOptimization
             )
 
-            // 5. Xiaomi Autostart (if device is Xiaomi / Redmi / POCO)
+            // 6. Xiaomi Autostart (if device is Xiaomi / Redmi / POCO)
             if (isXiaomi && onOpenXiaomiAutostart != null) {
                 PermissionRowCard(
                     title = "HyperOS / MIUI Autostart",
@@ -713,7 +835,7 @@ private fun PermissionRowCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .clickable(onClick = onGrantClick)
+            .expressiveClickable(onClick = onGrantClick)
     ) {
         Row(
             modifier = Modifier

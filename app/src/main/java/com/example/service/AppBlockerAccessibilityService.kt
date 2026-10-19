@@ -17,16 +17,16 @@ import com.example.data.ChapterLockRepository
 import com.example.data.SystemAppInspector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Real-time event-driven accessibility service that intercepts distraction apps
- * in <0.02ms on Android devices without CPU polling.
- *
- * Self-sufficient: loads and synchronizes blocking rules directly from the Room database
- * so it continues functioning even if MainActivity is killed or backgrounded.
+ * Real-time Accessibility Service that intercepts distraction apps and enforces
+ * Focus Lock and Daily Limits via both native WindowManager overlays and MainActivity.
  */
 class AppBlockerAccessibilityService : AccessibilityService() {
 
@@ -41,23 +41,29 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var enforcementLoopJob: Job? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         isServiceConnected = true
-        Log.i(TAG, "LockIN Accessibility Service connected successfully.")
+        Log.i(TAG, "LockIN Accessibility Service connected.")
 
         createNotificationChannel()
+        AppMonitorService.start(applicationContext)
 
-        // 1. Instantly load rules and active focus state from SQLite
+        val db = ChapterLockDatabase.getInstance(applicationContext)
+        val inspector = SystemAppInspector(applicationContext)
+        val repo = ChapterLockRepository(db.dao(), inspector)
+
+        // 1. Load rules and active focus state from SQLite
         serviceScope.launch {
             try {
-                val db = ChapterLockDatabase.getInstance(applicationContext)
-                val inspector = SystemAppInspector(applicationContext)
-                val repo = ChapterLockRepository(db.dao(), inspector)
                 repo.ensureSeededAndSynced()
+                val discovered = inspector.discoverCandidateApps()
+                ChapterLockEnforcer.registerAppLabels(
+                    discovered.associate { it.packageName to it.appName }
+                )
 
-                // 2. Continuously observe rule changes in real-time
                 db.dao().observeAppRules().collect { rules ->
                     ChapterLockEnforcer.syncRules(rules)
                 }
@@ -66,10 +72,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 3. Continuously observe focus config changes
+        // 2. Continuously observe focus config changes
         serviceScope.launch {
             try {
-                val db = ChapterLockDatabase.getInstance(applicationContext)
                 db.dao().observeFocusConfig().collect { config ->
                     if (config != null) {
                         ChapterLockEnforcer.updateFocusLockState(
@@ -78,40 +83,101 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                             pinnedName = config.pinnedAppName,
                             endTimeMs = config.endTimeEpochMs
                         )
+                        LockNotificationManager.refreshForegroundNotification(applicationContext)
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to observe focus config in accessibility service", e)
             }
         }
+
+        // 3. Continuous 500ms active window & live usage enforcement loop
+        // Ensures that even if YouTube is already open when its daily timer expires,
+        // or if an app switch skips TYPE_WINDOW_STATE_CHANGED, it is blocked within 0.5s.
+        enforcementLoopJob?.cancel()
+        enforcementLoopJob = serviceScope.launch {
+            var tick = 0L
+            while (isActive) {
+                try {
+                    if (tick % 4L == 0L) {
+                        repo.syncSystemUsageStats()
+                        LockNotificationManager.checkAndNotifyLimitMilestones(
+                            applicationContext,
+                            repo.getAllAppRulesOnce()
+                        )
+                    }
+                    val activeWindowPkg = try {
+                        rootInActiveWindow?.packageName?.toString()
+                    } catch (_: Exception) {
+                        null
+                    }
+                    val fgPkg = activeWindowPkg?.takeIf { it.isNotBlank() }
+                        ?: inspector.queryCurrentForegroundPackage()
+
+                    if (!fgPkg.isNullOrBlank()) {
+                        inspectAndEnforcePackage(fgPkg)
+                    }
+                } catch (_: Exception) {
+                }
+                tick++
+                delay(500L)
+            }
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        if (event == null) return
+        val type = event.eventType
+        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            type != AccessibilityEvent.TYPE_WINDOWS_CHANGED &&
+            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+        ) {
             return
         }
 
-        val packageName = event.packageName?.toString() ?: return
+        val eventPkg = event.packageName?.toString()
+        val rootPkg = try {
+            rootInActiveWindow?.packageName?.toString()
+        } catch (_: Exception) {
+            null
+        }
+        val candidatePkg = eventPkg?.takeIf { it.isNotBlank() } ?: rootPkg ?: return
+        inspectAndEnforcePackage(candidatePkg)
+    }
+
+    private fun inspectAndEnforcePackage(packageName: String) {
         val myPackageName = applicationContext.packageName
+        if (packageName == myPackageName) return
 
         val decision = ChapterLockEnforcer.evaluatePackage(packageName, myPackageName) ?: return
 
-        if (ChapterLockEnforcer.shouldThrottleIntercept(packageName)) {
+        if (MainActivity.isInForeground || LockWindowOverlayManager.isShowingFor(packageName)) {
+            return
+        }
+
+        if (ChapterLockEnforcer.shouldThrottleIntercept(packageName) && LockWindowOverlayManager.isShowing()) {
             return
         }
 
         Log.w(TAG, "Intercepting package: $packageName for reason: ${decision.reason}")
 
-        // 1. Kick the user out of the distracting app immediately
-        try {
-            performGlobalAction(GLOBAL_ACTION_HOME)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to perform global action home", e)
-        }
+        // 1. Immediately display the System Window Overlay Barrier over the target app
+        // (Uses TYPE_APPLICATION_OVERLAY or TYPE_ACCESSIBILITY_OVERLAY so OEM BAL cannot block it)
+        LockWindowOverlayManager.showBarrier(
+            context = this,
+            decision = decision,
+            isFromAccessibilityService = true
+        )
 
-        // 2. Launch LockIN Friction Shield directly
+        // 2. Also launch MainActivity Friction Shield directly (without calling GLOBAL_ACTION_HOME first,
+        // which would trigger Android's 5-second stopAppSwitches BAL lock)
         val intent = Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_NO_ANIMATION
+            )
             putExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE, decision.packageName)
             putExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON, decision.reason.name)
         }
@@ -119,11 +185,10 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         try {
             startActivity(intent)
         } catch (e: Exception) {
-            Log.e(TAG, "Direct startActivity blocked by background restrictions", e)
+            Log.e(TAG, "Direct startActivity suppressed; overlay barrier active", e)
         }
 
-        // 3. Post a high-priority Heads-Up Notification with FullScreenIntent
-        // This guarantees the friction shield triggers even on restrictive Android 10-15 OEMs (e.g. Xiaomi HyperOS)
+        // 3. Post high-priority FullScreenIntent notification
         try {
             showInterceptNotification(decision.appName, decision.reason, intent)
         } catch (e: Exception) {
@@ -131,7 +196,11 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun showInterceptNotification(appName: String, reason: InterceptReason, targetIntent: Intent) {
+    private fun showInterceptNotification(
+        appName: String,
+        reason: InterceptReason,
+        targetIntent: Intent
+    ) {
         val pendingIntent = PendingIntent.getActivity(
             this,
             101,
@@ -140,15 +209,15 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         )
 
         val title = if (reason == InterceptReason.FOCUS_LOCK_BREACH) {
-            "Focus Lock Active: $appName Intercepted"
+            "Focus Lock Active: $appName Blocked"
         } else {
             "Daily Limit Reached: $appName"
         }
 
         val text = if (reason == InterceptReason.FOCUS_LOCK_BREACH) {
-            "Stay locked into reading. Tap to view friction puzzle."
+            "Return to your pinned focus app or solve the puzzle."
         } else {
-            "Daily screen time exhausted. Tap to view unlock options."
+            "Daily screen time exhausted. Tap to view unlock puzzle."
         }
 
         val notification = NotificationCompat.Builder(this, INTERCEPT_CHANNEL_ID)
@@ -188,7 +257,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         isServiceConnected = false
+        enforcementLoopJob?.cancel()
         serviceScope.cancel()
+        LockWindowOverlayManager.dismiss()
         super.onDestroy()
         Log.i(TAG, "LockIN Accessibility Service destroyed.")
     }

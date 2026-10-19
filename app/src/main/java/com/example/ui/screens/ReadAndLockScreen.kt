@@ -1,20 +1,20 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -64,6 +65,8 @@ import com.example.data.formatMinutesClean
 import com.example.ui.components.ExpressiveCloverShape
 import com.example.ui.components.scallopedCookieShape
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LockInMotion
+import com.example.ui.theme.expressiveClickable
 import com.example.viewmodel.ActiveFocusSessionState
 
 private val FOCUS_DURATION_ROWS = listOf(
@@ -81,6 +84,7 @@ fun ReadAndLockScreen(
     onSelectDuration: (Int) -> Unit,
     onStartFocusLock: () -> Unit,
     onLaunchPinnedApp: (String) -> Unit,
+    onExtendFocusLock: () -> Unit = {},
     onRequestQuitFocusEarly: () -> Unit,
     onOpenSelectFocusAppSheet: () -> Unit,
     modifier: Modifier = Modifier
@@ -137,7 +141,9 @@ fun ReadAndLockScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(32.dp))
-                        .clickable(enabled = !activeSession.isActive) { onOpenSelectFocusAppSheet() }
+                        .expressiveClickable(enabled = !activeSession.isActive) {
+                            onOpenSelectFocusAppSheet()
+                        }
                         .testTag("select_focus_app_card")
                 ) {
                     Column(
@@ -219,7 +225,7 @@ fun ReadAndLockScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(CircleShape)
-                                    .clickable { onOpenSelectFocusAppSheet() }
+                                    .expressiveClickable { onOpenSelectFocusAppSheet() }
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -263,13 +269,19 @@ fun ReadAndLockScreen(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(
-                                    text = formatMinutesClean(activeSession.selectedDurationMinutes),
-                                    fontFamily = JetBrainsMonoFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.tertiary
-                                )
+                                AnimatedContent(
+                                    targetState = activeSession.selectedDurationMinutes,
+                                    transitionSpec = { LockInMotion.numericCounterTransition() },
+                                    label = "tablet_selected_duration"
+                                ) { mins ->
+                                    Text(
+                                        text = formatMinutesClean(mins),
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
                             }
 
                             DurationUniformGrid(
@@ -277,7 +289,6 @@ fun ReadAndLockScreen(
                                 pillHeight = 52.dp,
                                 unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 onSelectDuration = { mins ->
-                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onSelectDuration(mins)
                                 }
                             )
@@ -374,15 +385,18 @@ fun ReadAndLockScreen(
                             .aspectRatio(1f),
                         contentAlignment = Alignment.Center
                     ) {
+                        val vesselColor by animateColorAsState(
+                            targetValue = if (activeSession.isActive) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            animationSpec = LockInMotion.spatialSpring(),
+                            label = "tablet_vessel_color"
+                        )
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .rotate(if (activeSession.isActive) vesselRotation else 15f)
                                 .clip(GiantStarburstShape)
-                                .background(
-                                    if (activeSession.isActive) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceContainerHigh
-                                )
+                                .background(vesselColor)
                         )
 
                         Column(
@@ -404,12 +418,13 @@ fun ReadAndLockScreen(
                                 )
                             }
 
+                            val displayTimerText = if (activeSession.isActive) {
+                                activeSession.formattedCountdown
+                            } else {
+                                formatMinutesClean(activeSession.selectedDurationMinutes)
+                            }
                             Text(
-                                text = if (activeSession.isActive) {
-                                    activeSession.formattedCountdown
-                                } else {
-                                    formatMinutesClean(activeSession.selectedDurationMinutes)
-                                },
+                                text = displayTimerText,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = if (activeSession.isActive && activeSession.remainingSeconds >= 3600) 50.sp else 64.sp,
@@ -442,32 +457,72 @@ fun ReadAndLockScreen(
                                 .testTag("active_lockdown_card"),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.tertiaryContainer,
-                                shape = CircleShape,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(64.dp)
-                                    .clip(CircleShape)
-                                    .clickable { onLaunchPinnedApp(activeSession.pinnedPackageName) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
+                                Surface(
+                                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                                    shape = CircleShape,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(60.dp)
+                                        .clip(CircleShape)
+                                        .expressiveClickable { onLaunchPinnedApp(activeSession.pinnedPackageName) }
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = "Open $appName",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxSize(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Open $appName",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    shape = CircleShape,
+                                    modifier = Modifier
+                                        .height(60.dp)
+                                        .clip(CircleShape)
+                                        .expressiveClickable { onExtendFocusLock() }
+                                        .testTag("extend_focus_lock_button")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .padding(horizontal = 20.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Add,
+                                            contentDescription = "Extend 15 minutes",
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "15m",
+                                            fontFamily = JetBrainsMonoFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
                                 }
                             }
 
@@ -478,7 +533,7 @@ fun ReadAndLockScreen(
                                     .fillMaxWidth()
                                     .height(52.dp)
                                     .clip(CircleShape)
-                                    .clickable {
+                                    .expressiveClickable {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         onRequestQuitFocusEarly()
                                     }
@@ -512,7 +567,7 @@ fun ReadAndLockScreen(
                                 .fillMaxWidth()
                                 .height(68.dp)
                                 .clip(CircleShape)
-                                .clickable {
+                                .expressiveClickable(pressedScale = 0.968f) {
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                     onStartFocusLock()
                                 }
@@ -573,7 +628,7 @@ fun ReadAndLockScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(CircleShape)
-                    .clickable(enabled = !activeSession.isActive) {
+                    .expressiveClickable(enabled = !activeSession.isActive) {
                         onOpenSelectFocusAppSheet()
                     }
                     .testTag("select_focus_app_card")
@@ -666,15 +721,18 @@ fun ReadAndLockScreen(
                     .aspectRatio(1f),
                 contentAlignment = Alignment.Center
             ) {
+                val vesselColor by animateColorAsState(
+                    targetValue = if (activeSession.isActive) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    animationSpec = LockInMotion.spatialSpring(),
+                    label = "phone_vessel_color"
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .rotate(if (activeSession.isActive) vesselRotation else 15f)
                         .clip(GiantStarburstShape)
-                        .background(
-                            if (activeSession.isActive) MaterialTheme.colorScheme.primaryContainer
-                            else MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
+                        .background(vesselColor)
                 )
 
                 Column(
@@ -726,8 +784,13 @@ fun ReadAndLockScreen(
             AnimatedContent(
                 targetState = activeSession.isActive,
                 transitionSpec = {
-                    fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) togetherWith
-                            fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                    (fadeIn(animationSpec = tween(180)) + scaleIn(
+                        initialScale = 0.96f,
+                        animationSpec = LockInMotion.spatialSpring()
+                    )) togetherWith (fadeOut(animationSpec = tween(130)) + scaleOut(
+                        targetScale = 0.96f,
+                        animationSpec = LockInMotion.spatialSpring()
+                    ))
                 },
                 label = "FocusControlsMorph"
             ) { isLocked ->
@@ -738,34 +801,74 @@ fun ReadAndLockScreen(
                             .testTag("active_lockdown_card"),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            shape = CircleShape,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(68.dp)
-                                .clip(CircleShape)
-                                .clickable { onLaunchPinnedApp(activeSession.pinnedPackageName) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Row(
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                shape = CircleShape,
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 24.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .weight(1f)
+                                    .height(64.dp)
+                                    .clip(CircleShape)
+                                    .expressiveClickable { onLaunchPinnedApp(activeSession.pinnedPackageName) }
                             ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "Open $appName",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 20.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Open $appName",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .height(64.dp)
+                                    .clip(CircleShape)
+                                    .expressiveClickable { onExtendFocusLock() }
+                                    .testTag("extend_focus_lock_button")
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .padding(horizontal = 20.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Add,
+                                        contentDescription = "Extend 15 minutes",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "15m",
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
                             }
                         }
 
@@ -776,7 +879,7 @@ fun ReadAndLockScreen(
                                 .fillMaxWidth()
                                 .height(56.dp)
                                 .clip(CircleShape)
-                                .clickable {
+                                .expressiveClickable {
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                     onRequestQuitFocusEarly()
                                 }
@@ -812,7 +915,6 @@ fun ReadAndLockScreen(
                             pillHeight = 50.dp,
                             unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                             onSelectDuration = { mins ->
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onSelectDuration(mins)
                             }
                         )
@@ -824,7 +926,7 @@ fun ReadAndLockScreen(
                                 .fillMaxWidth()
                                 .height(72.dp)
                                 .clip(CircleShape)
-                                .clickable {
+                                .expressiveClickable(pressedScale = 0.968f) {
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                     onStartFocusLock()
                                 }
@@ -890,22 +992,24 @@ private fun DurationUniformGrid(
                     val selected = selectedDurationMinutes == mins
                     val cornerRadius by animateDpAsState(
                         targetValue = if (selected) 16.dp else 26.dp,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
+                        animationSpec = LockInMotion.subtleBounceSpring(),
                         label = "DurationMorphCorner"
+                    )
+                    val containerColor by animateColorAsState(
+                        targetValue = if (selected) MaterialTheme.colorScheme.tertiaryContainer
+                        else unselectedContainerColor,
+                        animationSpec = LockInMotion.spatialSpring(),
+                        label = "DurationMorphColor"
                     )
 
                     Surface(
-                        color = if (selected) MaterialTheme.colorScheme.tertiaryContainer
-                        else unselectedContainerColor,
+                        color = containerColor,
                         shape = RoundedCornerShape(cornerRadius),
                         modifier = Modifier
                             .weight(1f)
                             .height(pillHeight)
                             .clip(RoundedCornerShape(cornerRadius))
-                            .clickable { onSelectDuration(mins) }
+                            .expressiveClickable { onSelectDuration(mins) }
                             .testTag("duration_pill_$mins")
                     ) {
                         Box(

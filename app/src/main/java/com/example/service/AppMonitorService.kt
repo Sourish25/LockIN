@@ -1,9 +1,5 @@
 package com.example.service
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -11,14 +7,11 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.example.MainActivity
-import com.example.R
 import com.example.data.ChapterLockDatabase
 import com.example.data.ChapterLockRepository
 import com.example.data.SystemAppInspector
-import com.example.data.formatMinutesClean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,14 +23,15 @@ import kotlinx.coroutines.launch
 
 /**
  * Foreground Service that maintains LockIN's ongoing system presence,
- * periodic UsageStats synchronization, and fallback foreground app detection.
+ * live 2.4-second UsageStats synchronization, milestone notifications,
+ * and continuous 600ms foreground app enforcement.
  */
 class AppMonitorService : Service() {
 
     companion object {
         const val TAG = "AppMonitorService"
-        const val CHANNEL_ID = "chapterlock_monitor_channel"
-        const val NOTIFICATION_ID = 2001
+        const val CHANNEL_ID = LockNotificationManager.CHANNEL_GUARD_ID
+        const val NOTIFICATION_ID = LockNotificationManager.NOTIFICATION_ID_FOREGROUND
 
         fun start(context: Context) {
             try {
@@ -58,12 +52,9 @@ class AppMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        LockNotificationManager.ensureChannels(this)
 
-        val initialNotification = buildNotification(
-            title = "LockIN Active",
-            text = "Enforcing daily limits and reading focus guard"
-        )
+        val initialNotification = LockNotificationManager.buildForegroundServiceNotification(this)
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -78,14 +69,21 @@ class AppMonitorService : Service() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "startForeground error", e)
-            startForeground(NOTIFICATION_ID, initialNotification)
+            try {
+                startForeground(NOTIFICATION_ID, initialNotification)
+            } catch (_: Exception) {
+            }
         }
 
         startMonitoringLoop()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        updateNotification()
+        if (monitorJob?.isActive != true) {
+            startMonitoringLoop()
+        } else {
+            LockNotificationManager.refreshForegroundNotification(this)
+        }
         return START_STICKY
     }
 
@@ -93,46 +91,74 @@ class AppMonitorService : Service() {
 
     private fun startMonitoringLoop() {
         val database = ChapterLockDatabase.getInstance(applicationContext)
+        val dao = database.dao()
         val inspector = SystemAppInspector(applicationContext)
-        val repository = ChapterLockRepository(database.dao(), inspector)
+        val repository = ChapterLockRepository(dao, inspector)
 
         monitorJob?.cancel()
         monitorJob = serviceScope.launch {
+            try {
+                repository.ensureSeededAndSynced()
+                val discovered = inspector.discoverCandidateApps()
+                ChapterLockEnforcer.registerAppLabels(
+                    discovered.associate { it.packageName to it.appName }
+                )
+                LockNotificationManager.refreshForegroundNotification(applicationContext)
+            } catch (_: Exception) {
+            }
+
             var loopCount = 0L
 
             while (isActive) {
                 try {
-                    val isAccessibilityConnected = AppBlockerAccessibilityService.isServiceConnected
-
-                    // 1. Sync screen time stats every 30 seconds
-                    if (loopCount % 12L == 0L) {
+                    // 1. Sync live screen time stats & check 80%/100% notification milestones every ~2.4 seconds
+                    if (loopCount % 4L == 0L) {
                         repository.syncSystemUsageStats()
+                        val currentRules = repository.getAllAppRulesOnce()
+                        LockNotificationManager.checkAndNotifyLimitMilestones(applicationContext, currentRules)
                     }
 
-                    // 2. Notification updates during Focus Lock
-                    if (ChapterLockEnforcer.isFocusActive()) {
-                        val remainingSecs = ChapterLockEnforcer.getFocusRemainingSeconds()
-                        val remainingMins = (remainingSecs / 60).coerceAtLeast(1)
-                        val appName = ChapterLockEnforcer.getPinnedAppName()
-                        updateNotification(
-                            title = "Focus Lock: $appName",
-                            text = "${formatMinutesClean(remainingMins)} remaining • Distractions locked"
+                    // 2. Check if an active Focus Lock session naturally completed in the background
+                    val focusConfig = dao.getFocusConfigOnce()
+                    if (focusConfig != null && focusConfig.isActive && !focusConfig.isStillActive()) {
+                        val completedName = focusConfig.pinnedAppName.ifBlank { "Focus App" }
+                        val completedPkg = focusConfig.pinnedPackageName
+                        val completedDuration = focusConfig.selectedDurationMinutes
+                        repository.endFocusLockSession(earlyQuit = false)
+                        LockNotificationManager.notifyFocusSessionCompleted(
+                            context = applicationContext,
+                            completedAppName = completedName,
+                            completedPackageName = completedPkg,
+                            durationMinutes = completedDuration
                         )
-                    } else if (loopCount % 24L == 0L) {
-                        updateNotification(
-                            title = "LockIN Active",
-                            text = "Daily app limits guarded"
-                        )
+                    } else if (loopCount % 5L == 0L) {
+                        LockNotificationManager.refreshForegroundNotification(applicationContext)
                     }
 
-                    // 3. Fallback package inspection only if Accessibility Service is NOT connected
-                    if (!isAccessibilityConnected) {
-                        val fgPkg = inspector.queryCurrentForegroundPackage()
-                        if (fgPkg != null && fgPkg != packageName) {
-                            val decision = ChapterLockEnforcer.evaluatePackage(fgPkg, packageName)
-                            if (decision != null && !ChapterLockEnforcer.shouldThrottleIntercept(fgPkg)) {
+                    // 3. Always inspect foreground package via UsageEvents (reinforces AccessibilityService)
+                    val fgPkg = inspector.queryCurrentForegroundPackage()
+                    if (!fgPkg.isNullOrBlank() && fgPkg != packageName) {
+                        val decision = ChapterLockEnforcer.evaluatePackage(fgPkg, packageName)
+                        if (decision != null &&
+                            !MainActivity.isInForeground &&
+                            !LockWindowOverlayManager.isShowingFor(fgPkg)
+                        ) {
+                            if (!ChapterLockEnforcer.shouldThrottleIntercept(fgPkg) ||
+                                !LockWindowOverlayManager.isShowing()
+                            ) {
+                                LockWindowOverlayManager.showBarrier(
+                                    context = applicationContext,
+                                    decision = decision,
+                                    isFromAccessibilityService = false
+                                )
+
                                 val openIntent = Intent(applicationContext, MainActivity::class.java).apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    addFlags(
+                                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                                                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                                Intent.FLAG_ACTIVITY_NO_ANIMATION
+                                    )
                                     putExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE, decision.packageName)
                                     putExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON, decision.reason.name)
                                 }
@@ -147,51 +173,9 @@ class AppMonitorService : Service() {
                 }
 
                 loopCount++
-                // 2.5s loop for smooth responsiveness while preserving battery
-                delay(2500L)
+                delay(600L)
             }
         }
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = getString(R.string.notification_channel_desc)
-                setShowBadge(false)
-            }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
-        }
-    }
-
-    private fun buildNotification(title: String, text: String): Notification {
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setSmallIcon(R.drawable.ic_stat_lockin)
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .setSilent(true)
-            .build()
-    }
-
-    private fun updateNotification(
-        title: String = "LockIN Active",
-        text: String = "Focus and daily limits guarded"
-    ) {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        manager?.notify(NOTIFICATION_ID, buildNotification(title, text))
     }
 
     override fun onDestroy() {

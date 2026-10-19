@@ -2,6 +2,7 @@ package com.example.data
 
 import android.content.Intent
 import com.example.service.ChapterLockEnforcer
+import com.example.service.LockWindowOverlayManager
 import kotlinx.coroutines.flow.Flow
 
 class ChapterLockRepository(
@@ -16,14 +17,41 @@ class ChapterLockRepository(
     fun hasUsageStatsPermission(): Boolean = systemInspector.hasUsageStatsPermission()
     fun hasAccessibilityPermission(): Boolean = systemInspector.hasAccessibilityPermission()
     fun hasOverlayPermission(): Boolean = systemInspector.hasOverlayPermission()
+    fun hasNotificationPermission(): Boolean = systemInspector.hasNotificationPermission()
     fun isIgnoringBatteryOptimizations(): Boolean = systemInspector.isIgnoringBatteryOptimizations()
     fun isXiaomiDevice(): Boolean = systemInspector.isXiaomiDevice()
 
-    fun createUsageAccessIntent(): Intent = systemInspector.createUsageAccessSettingsIntent()
-    fun createAccessibilitySettingsIntent(): Intent = systemInspector.createAccessibilitySettingsIntent()
-    fun createOverlaySettingsIntent(): Intent = systemInspector.createOverlaySettingsIntent()
-    fun createBatteryOptimizationIntent(): Intent = systemInspector.createBatteryOptimizationIntent()
-    fun createXiaomiAutostartIntent(): Intent? = systemInspector.createXiaomiAutostartIntent()
+    fun createUsageAccessIntent(): Intent {
+        ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        return systemInspector.createUsageAccessSettingsIntent()
+    }
+
+    fun createAccessibilitySettingsIntent(): Intent {
+        ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        return systemInspector.createAccessibilitySettingsIntent()
+    }
+
+    fun createOverlaySettingsIntent(): Intent {
+        ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        return systemInspector.createOverlaySettingsIntent()
+    }
+
+    fun createNotificationSettingsIntent(): Intent {
+        ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        return systemInspector.createNotificationSettingsIntent()
+    }
+
+    fun createBatteryOptimizationIntent(): Intent {
+        ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        return systemInspector.createBatteryOptimizationIntent()
+    }
+
+    fun createXiaomiAutostartIntent(): Intent? {
+        ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        return systemInspector.createXiaomiAutostartIntent()
+    }
+
+    fun createHomeScreenIntent(): Intent = systemInspector.createHomeScreenIntent()
 
     fun createLaunchIntent(packageName: String): Intent? =
         systemInspector.createLaunchIntentForPackage(packageName)
@@ -31,6 +59,8 @@ class ChapterLockRepository(
     fun discoverCandidateApps(): List<DiscoveredDeviceApp> = systemInspector.discoverCandidateApps()
 
     fun queryCurrentForegroundPackage(): String? = systemInspector.queryCurrentForegroundPackage()
+
+    suspend fun getAllAppRulesOnce(): List<AppTimerRuleEntity> = dao.getAllAppRulesOnce()
 
     /**
      * Synchronizes midnight daily counter resets, real installed reader apps,
@@ -58,8 +88,9 @@ class ChapterLockRepository(
 
         // Ensure active focus config row exists without pre-populating any demo or unchosen apps
         val currentConfig = dao.getFocusConfigOnce()
+        val allPinned = dao.getAllPinnedFocusAppsOnce()
+        val selectedApp = allPinned.firstOrNull { it.isSelected } ?: allPinned.firstOrNull()
         if (currentConfig == null) {
-            val selectedApp = dao.getAllPinnedFocusAppsOnce().firstOrNull { it.isSelected }
             dao.saveFocusConfig(
                 FocusActiveConfigEntity(
                     pinnedPackageName = selectedApp?.packageName ?: "",
@@ -81,6 +112,14 @@ class ChapterLockRepository(
                     )
                 )
             }
+        } else if (currentConfig.pinnedPackageName.isBlank() && selectedApp != null) {
+            dao.saveFocusConfig(
+                currentConfig.copy(
+                    pinnedPackageName = selectedApp.packageName,
+                    pinnedAppName = selectedApp.appName,
+                    pinnedSubtitle = selectedApp.subtitle
+                )
+            )
         }
 
         syncSystemUsageStats()
@@ -124,7 +163,7 @@ class ChapterLockRepository(
 
     suspend fun updateAppDailyLimit(packageName: String, dailyLimitMinutes: Int) {
         val existing = dao.getAppRule(packageName) ?: return
-        dao.upsertAppRule(existing.copy(dailyLimitMinutes = dailyLimitMinutes.coerceIn(5, 360)))
+        dao.upsertAppRule(existing.copy(dailyLimitMinutes = dailyLimitMinutes.coerceIn(1, 360)))
         syncEnforcerState()
     }
 
@@ -138,13 +177,13 @@ class ChapterLockRepository(
         val usedToday = systemUsageMap[packageName] ?: 0
         val existing = dao.getAppRule(packageName)
         val rule = existing?.copy(
-            dailyLimitMinutes = dailyLimitMinutes.coerceIn(5, 360),
+            dailyLimitMinutes = dailyLimitMinutes.coerceIn(1, 360),
             usedMinutesToday = usedToday
         ) ?: AppTimerRuleEntity(
             packageName = packageName,
             appName = appName,
             category = category,
-            dailyLimitMinutes = dailyLimitMinutes.coerceIn(5, 360),
+            dailyLimitMinutes = dailyLimitMinutes.coerceIn(1, 360),
             usedMinutesToday = usedToday,
             blockDuringReading = true
         )
@@ -162,6 +201,7 @@ class ChapterLockRepository(
         val unlockUntil = System.currentTimeMillis() + passMinutes * 60_000L
         dao.upsertAppRule(existing.copy(unlockedUntilEpochMs = unlockUntil))
         ChapterLockEnforcer.grantTemporaryUnlock(packageName, passMinutes)
+        LockWindowOverlayManager.dismiss()
     }
 
     suspend fun selectPinnedFocusApp(packageName: String) {
@@ -210,25 +250,68 @@ class ChapterLockRepository(
     suspend fun setFocusDuration(minutes: Int) {
         val config = dao.getFocusConfigOnce() ?: FocusActiveConfigEntity()
         if (!config.isActive) {
-            dao.saveFocusConfig(config.copy(selectedDurationMinutes = minutes.coerceIn(10, 240)))
+            dao.saveFocusConfig(config.copy(selectedDurationMinutes = minutes.coerceIn(5, 240)))
         }
     }
 
-    suspend fun startFocusLockSession(): FocusActiveConfigEntity? {
+    suspend fun startFocusLockSession(
+        fallbackPackageName: String = "",
+        fallbackAppName: String = "",
+        fallbackSubtitle: String = "",
+        overrideDurationMinutes: Int? = null
+    ): FocusActiveConfigEntity? {
         val config = dao.getFocusConfigOnce() ?: FocusActiveConfigEntity()
-        if (config.pinnedPackageName.isBlank()) {
+        val resolvedPkg = config.pinnedPackageName.ifBlank { fallbackPackageName }
+        val resolvedName = config.pinnedAppName.ifBlank { fallbackAppName }
+        val resolvedSub = config.pinnedSubtitle.ifBlank { fallbackSubtitle }
+        val resolvedDuration = (overrideDurationMinutes ?: config.selectedDurationMinutes).coerceIn(5, 240)
+
+        if (resolvedPkg.isBlank()) {
             return null
         }
+
         val now = System.currentTimeMillis()
-        val endTime = now + (config.selectedDurationMinutes * 60_000L)
+        val endTime = now + (resolvedDuration * 60_000L)
         val activeConfig = config.copy(
+            pinnedPackageName = resolvedPkg,
+            pinnedAppName = resolvedName,
+            pinnedSubtitle = resolvedSub,
+            selectedDurationMinutes = resolvedDuration,
             isActive = true,
             startedAtEpochMs = now,
             endTimeEpochMs = endTime
         )
         dao.saveFocusConfig(activeConfig)
+        ChapterLockEnforcer.updateFocusLockState(
+            active = true,
+            pinnedPackage = resolvedPkg,
+            pinnedName = resolvedName,
+            endTimeMs = endTime
+        )
         syncEnforcerState()
         return activeConfig
+    }
+
+    suspend fun extendActiveFocusSession(extraMinutes: Int = 15): FocusActiveConfigEntity? {
+        val config = dao.getFocusConfigOnce() ?: return null
+        if (!config.isActive) return null
+        val now = System.currentTimeMillis()
+        val baseEnd = config.endTimeEpochMs.coerceAtLeast(now)
+        val newEnd = baseEnd + (extraMinutes.coerceIn(5, 120) * 60_000L)
+        val newTotalMinutes = (config.selectedDurationMinutes + extraMinutes).coerceAtMost(360)
+        val updated = config.copy(
+            selectedDurationMinutes = newTotalMinutes,
+            endTimeEpochMs = newEnd
+        )
+        dao.saveFocusConfig(updated)
+        ChapterLockEnforcer.updateFocusLockState(
+            active = true,
+            pinnedPackage = updated.pinnedPackageName,
+            pinnedName = updated.pinnedAppName,
+            endTimeMs = newEnd
+        )
+        syncEnforcerState()
+        return updated
     }
 
     suspend fun endFocusLockSession(earlyQuit: Boolean = false) {
@@ -250,6 +333,13 @@ class ChapterLockRepository(
                 )
             }
             dao.saveFocusConfig(config.copy(isActive = false))
+            ChapterLockEnforcer.updateFocusLockState(
+                active = false,
+                pinnedPackage = config.pinnedPackageName,
+                pinnedName = config.pinnedAppName,
+                endTimeMs = 0L
+            )
+            LockWindowOverlayManager.dismiss()
             syncEnforcerState()
         }
     }

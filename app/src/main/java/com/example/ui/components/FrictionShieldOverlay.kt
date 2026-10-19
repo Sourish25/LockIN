@@ -411,27 +411,37 @@ private fun ActivePuzzleContent(
     onPhraseChanged: (String) -> Unit,
     onConfirmPhraseUnlock: () -> Unit
 ) {
-    when (challenge.mode) {
-        ChallengeMode.MEMORY_GRID -> {
-            MemoryGridPuzzleCard(
-                challenge = challenge,
-                onTapTile = onTapMemoryTile,
-                onReplayPattern = onReplayMemoryPattern
+    androidx.compose.animation.AnimatedContent(
+        targetState = challenge.mode,
+        transitionSpec = {
+            com.example.ui.theme.LockInMotion.directionalTabTransition(
+                movingForward = targetState.ordinal >= initialState.ordinal
             )
-        }
-        ChallengeMode.MATH_CHAIN -> {
-            HardMathPuzzleCard(
-                challenge = challenge,
-                onMathInputChanged = onMathInputChanged,
-                onSubmitMathStep = onSubmitMathStep
-            )
-        }
-        ChallengeMode.PHRASE -> {
-            PhraseTypingPuzzleCard(
-                challenge = challenge,
-                onPhraseChanged = onPhraseChanged,
-                onConfirmUnlock = onConfirmPhraseUnlock
-            )
+        },
+        label = "puzzle_mode_transition"
+    ) { mode ->
+        when (mode) {
+            ChallengeMode.MEMORY_GRID -> {
+                MemoryGridPuzzleCard(
+                    challenge = challenge,
+                    onTapTile = onTapMemoryTile,
+                    onReplayPattern = onReplayMemoryPattern
+                )
+            }
+            ChallengeMode.MATH_CHAIN -> {
+                HardMathPuzzleCard(
+                    challenge = challenge,
+                    onMathInputChanged = onMathInputChanged,
+                    onSubmitMathStep = onSubmitMathStep
+                )
+            }
+            ChallengeMode.PHRASE -> {
+                PhraseTypingPuzzleCard(
+                    challenge = challenge,
+                    onPhraseChanged = onPhraseChanged,
+                    onConfirmUnlock = onConfirmPhraseUnlock
+                )
+            }
         }
     }
 }
@@ -444,9 +454,14 @@ private fun PuzzleModeTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
         else MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = com.example.ui.theme.LockInMotion.spatialSpring(),
+        label = "puzzle_tab_bg"
+    )
+    Surface(
+        color = bgColor,
         shape = CircleShape,
         modifier = modifier
             .height(44.dp)

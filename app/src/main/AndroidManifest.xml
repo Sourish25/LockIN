@@ -82,6 +82,18 @@
             </intent-filter>
         </receiver>
 
+        <!-- Interactive notification action receiver (+15m extend, open pinned app, lock app now) -->
+        <receiver
+            android:name=".service.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.action.OPEN_PINNED_APP" />
+                <action android:name="com.example.action.EXTEND_FOCUS_15M" />
+                <action android:name="com.example.action.START_BONUS_FOCUS_15M" />
+                <action android:name="com.example.action.LOCK_APP_NOW" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

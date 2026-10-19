@@ -20,20 +20,24 @@ data class DiscoveredDeviceApp(
     val appName: String,
     val category: String,
     val isInstalledOnDevice: Boolean = true,
-    val isReaderApp: Boolean = false
+    val isReaderApp: Boolean = false,
+    val usedMinutesToday: Int = 0
 )
 
 class SystemAppInspector(private val context: Context) {
 
-    // Core OS packages that must never be blocked to prevent locking the user out of device settings or home screen
+    // Core OS packages that must never be blocked to prevent locking the user out of the home launcher or system UI
     private val nonBlockableSystemPackages = setOf(
         "android",
         "com.android.systemui",
         "com.android.settings",
         "com.google.android.packageinstaller",
         "com.android.packageinstaller",
+        "com.google.android.permissioncontroller",
+        "com.android.permissioncontroller",
         "com.google.android.inputmethod.latin",
         "com.android.inputmethod.latin",
+        "com.samsung.android.honeyboard",
         "com.miui.home",
         "com.miui.securitycenter",
         "com.google.android.apps.nexuslauncher",
@@ -50,7 +54,12 @@ class SystemAppInspector(private val context: Context) {
                 Process.myUid(),
                 context.packageName
             )
-            mode == AppOpsManager.MODE_ALLOWED
+            if (mode == AppOpsManager.MODE_DEFAULT) {
+                context.checkCallingOrSelfPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) ==
+                        PackageManager.PERMISSION_GRANTED
+            } else {
+                mode == AppOpsManager.MODE_ALLOWED
+            }
         } catch (_: Exception) {
             false
         }
@@ -63,8 +72,11 @@ class SystemAppInspector(private val context: Context) {
                 context.contentResolver,
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
             ) ?: return false
-            val myComponentName = ComponentName(context, AppBlockerAccessibilityService::class.java).flattenToString()
-            enabledServices.contains(myComponentName)
+            val fullName = ComponentName(context, AppBlockerAccessibilityService::class.java).flattenToString()
+            val shortName = ComponentName(context, AppBlockerAccessibilityService::class.java).flattenToShortString()
+            enabledServices.contains(fullName, ignoreCase = true) ||
+                    enabledServices.contains(shortName, ignoreCase = true) ||
+                    enabledServices.contains(AppBlockerAccessibilityService::class.java.simpleName, ignoreCase = true)
         } catch (_: Exception) {
             false
         }
@@ -84,6 +96,34 @@ class SystemAppInspector(private val context: Context) {
             pm?.isIgnoringBatteryOptimizations(context.packageName) == true
         } else {
             true
+        }
+    }
+
+    fun hasNotificationPermission(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                        PackageManager.PERMISSION_GRANTED
+            } else {
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                nm?.areNotificationsEnabled() ?: true
+            }
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    fun createNotificationSettingsIntent(): Intent {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:${context.packageName}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
         }
     }
 
@@ -150,6 +190,13 @@ class SystemAppInspector(private val context: Context) {
         }
     }
 
+    fun createHomeScreenIntent(): Intent {
+        return Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
     fun createLaunchIntentForPackage(packageName: String): Intent? {
         if (packageName.isBlank()) return null
         return try {
@@ -161,6 +208,11 @@ class SystemAppInspector(private val context: Context) {
         }
     }
 
+    /**
+     * Calculates exact foreground minutes used today per package since local midnight (00:00:00).
+     * Combines granular UsageEvents (including the currently active foreground session in real time)
+     * with UsageStats buckets so active sessions like watching YouTube increment live every second.
+     */
     fun queryTodayUsageMinutesMap(): Map<String, Int> {
         if (!hasUsageStatsPermission()) return emptyMap()
         return try {
@@ -176,36 +228,81 @@ class SystemAppInspector(private val context: Context) {
             val startOfDay = calendar.timeInMillis
             val now = System.currentTimeMillis()
 
-            val resultMap = mutableMapOf<String, Int>()
+            val eventMillisMap = mutableMapOf<String, Long>()
+            val activeResumeMap = mutableMapOf<String, Long>()
 
-            // 1. Try modern aggregate stats first
-            val aggregated = usageStatsManager.queryAndAggregateUsageStats(startOfDay, now)
-            if (!aggregated.isNullOrEmpty()) {
-                for ((pkg, stat) in aggregated) {
-                    val minutes = (stat.totalTimeInForeground / 60000L).toInt()
-                    if (minutes > 0) {
-                        resultMap[pkg] = minutes
-                    }
-                }
-            } else {
-                // 2. Fallback to daily bucketed query
-                val stats = usageStatsManager.queryUsageStats(
-                    UsageStatsManager.INTERVAL_DAILY,
-                    startOfDay,
-                    now
-                )
-                if (stats != null) {
-                    val rawMap = mutableMapOf<String, Long>()
-                    for (stat in stats) {
-                        val totalMs = stat.totalTimeInForeground
-                        if (totalMs > 0L) {
-                            rawMap[stat.packageName] = (rawMap[stat.packageName] ?: 0L) + totalMs
+            // 1. Exact session calculation from UsageEvents (includes live in-progress foreground session)
+            val usageEvents = usageStatsManager.queryEvents(startOfDay, now)
+            if (usageEvents != null) {
+                val event = UsageEvents.Event()
+                while (usageEvents.hasNextEvent()) {
+                    usageEvents.getNextEvent(event)
+                    val pkg = event.packageName ?: continue
+                    val timestamp = event.timeStamp
+                    when (event.eventType) {
+                        UsageEvents.Event.ACTIVITY_RESUMED -> {
+                            activeResumeMap[pkg] = timestamp
+                        }
+                        UsageEvents.Event.ACTIVITY_PAUSED,
+                        UsageEvents.Event.ACTIVITY_STOPPED -> {
+                            val startTs = activeResumeMap.remove(pkg)
+                            if (startTs != null && timestamp > startTs) {
+                                val delta = (timestamp - startTs).coerceAtMost(6 * 3600_000L)
+                                eventMillisMap[pkg] = (eventMillisMap[pkg] ?: 0L) + delta
+                            }
                         }
                     }
-                    for ((pkg, ms) in rawMap) {
-                        val minutes = (ms / 60000L).toInt()
-                        if (minutes > 0) resultMap[pkg] = minutes
+                }
+            }
+
+            // Include the currently active foreground app's live elapsed time up to `now`
+            val currentFgEntry = activeResumeMap.maxByOrNull { it.value }
+            if (currentFgEntry != null && now > currentFgEntry.value) {
+                val liveDelta = (now - currentFgEntry.value).coerceAtMost(4 * 3600_000L)
+                eventMillisMap[currentFgEntry.key] =
+                    (eventMillisMap[currentFgEntry.key] ?: 0L) + liveDelta
+            }
+
+            // 2. Also query aggregated stats as a floor in case old events were compacted by the OS
+            val bucketMillisMap = mutableMapOf<String, Long>()
+            val dailyStats = usageStatsManager.queryUsageStats(
+                UsageStatsManager.INTERVAL_DAILY,
+                startOfDay,
+                now
+            )
+            if (dailyStats != null) {
+                for (stat in dailyStats) {
+                    if (stat.lastTimeUsed >= startOfDay && stat.totalTimeInForeground > 0L) {
+                        // Only trust daily bucket directly if its start timestamp belongs to today
+                        if (stat.firstTimeStamp >= startOfDay - 3600_000L) {
+                            val current = bucketMillisMap[stat.packageName] ?: 0L
+                            if (stat.totalTimeInForeground > current) {
+                                bucketMillisMap[stat.packageName] = stat.totalTimeInForeground
+                            }
+                        }
                     }
+                }
+            }
+
+            // If both are empty (e.g., OEM devices that only populate queryAndAggregateUsageStats)
+            if (eventMillisMap.isEmpty() && bucketMillisMap.isEmpty()) {
+                val aggregated = usageStatsManager.queryAndAggregateUsageStats(startOfDay, now)
+                if (!aggregated.isNullOrEmpty()) {
+                    for ((pkg, stat) in aggregated) {
+                        if (stat.lastTimeUsed >= startOfDay && stat.totalTimeInForeground > 0L) {
+                            bucketMillisMap[pkg] = stat.totalTimeInForeground
+                        }
+                    }
+                }
+            }
+
+            val allPackages = eventMillisMap.keys + bucketMillisMap.keys
+            val resultMap = mutableMapOf<String, Int>()
+            for (pkg in allPackages) {
+                val totalMs = maxOf(eventMillisMap[pkg] ?: 0L, bucketMillisMap[pkg] ?: 0L)
+                val minutes = (totalMs / 60_000L).toInt()
+                if (minutes > 0) {
+                    resultMap[pkg] = minutes
                 }
             }
             resultMap
@@ -214,6 +311,10 @@ class SystemAppInspector(private val context: Context) {
         }
     }
 
+    /**
+     * Accurately identifies the package currently in the foreground, even during long
+     * uninterrupted video playback (up to 2 hours without switching activities).
+     */
     fun queryCurrentForegroundPackage(): String? {
         if (!hasUsageStatsPermission()) return null
         return try {
@@ -222,22 +323,20 @@ class SystemAppInspector(private val context: Context) {
                     ?: return null
             val now = System.currentTimeMillis()
 
-            // 1. Check UsageEvents for the most recent ACTIVITY_RESUMED event
-            val events = usageStatsManager.queryEvents(now - 15_000L, now)
-            var lastForegroundPkg: String? = null
-            val event = UsageEvents.Event()
-            while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                    lastForegroundPkg = event.packageName
-                }
+            // 1. Fast check over the last 60 seconds
+            findLatestForegroundFromEvents(usageStatsManager, now - 60_000L, now)?.let {
+                return it
             }
-            if (lastForegroundPkg != null) return lastForegroundPkg
 
-            // 2. Fallback to max lastTimeUsed
+            // 2. Extended check over the last 2 hours (catches long YouTube / reading sessions)
+            findLatestForegroundFromEvents(usageStatsManager, now - 7_200_000L, now)?.let {
+                return it
+            }
+
+            // 3. Fallback to UsageStats most recent lastTimeUsed
             val stats = usageStatsManager.queryUsageStats(
                 UsageStatsManager.INTERVAL_DAILY,
-                now - 30_000L,
+                now - 300_000L,
                 now
             )
             stats?.maxByOrNull { it.lastTimeUsed }?.packageName
@@ -246,12 +345,35 @@ class SystemAppInspector(private val context: Context) {
         }
     }
 
+    private fun findLatestForegroundFromEvents(
+        usageStatsManager: UsageStatsManager,
+        startTime: Long,
+        endTime: Long
+    ): String? {
+        val events = usageStatsManager.queryEvents(startTime, endTime) ?: return null
+        var lastResumedPkg: String? = null
+        var lastResumedTime = 0L
+        val event = UsageEvents.Event()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            val pkg = event.packageName ?: continue
+            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                if (event.timeStamp >= lastResumedTime) {
+                    lastResumedTime = event.timeStamp
+                    lastResumedPkg = pkg
+                }
+            }
+        }
+        return lastResumedPkg
+    }
+
     /**
-     * Queries only real, launchable applications installed on the user's device.
-     * Contains zero fake or hardcoded uninstalled demo entries.
+     * Queries only real, launchable applications installed on the user's device,
+     * enriched with today's real screen time usage.
      */
     fun discoverCandidateApps(): List<DiscoveredDeviceApp> {
         val pm = context.packageManager
+        val usageMap = queryTodayUsageMinutesMap()
         val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
         }
@@ -270,7 +392,8 @@ class SystemAppInspector(private val context: Context) {
                     appName = label,
                     category = if (isReader) "Reader" else categorizePackage(pkg, label),
                     isInstalledOnDevice = true,
-                    isReaderApp = isReader
+                    isReaderApp = isReader,
+                    usedMinutesToday = usageMap[pkg] ?: 0
                 )
             }
         } catch (_: Exception) {
@@ -291,7 +414,8 @@ class SystemAppInspector(private val context: Context) {
                         appName = label,
                         category = if (isReader) "Reader" else categorizePackage(pkg, label),
                         isInstalledOnDevice = true,
-                        isReaderApp = isReader
+                        isReaderApp = isReader,
+                        usedMinutesToday = usageMap[pkg] ?: 0
                     )
                 }
             }
@@ -299,7 +423,8 @@ class SystemAppInspector(private val context: Context) {
         }
 
         return installedMap.values.sortedWith(
-            compareByDescending<DiscoveredDeviceApp> { it.isReaderApp }
+            compareByDescending<DiscoveredDeviceApp> { it.usedMinutesToday }
+                .thenByDescending { it.isReaderApp }
                 .thenBy { it.appName.lowercase() }
         )
     }
