@@ -19,6 +19,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.example.MainActivity
+import com.example.ui.components.ExpressiveCrossRainOverlayView
+import com.example.ui.theme.ExpressiveFeedbackEngine
 
 /**
  * Native system window overlay barrier (TYPE_APPLICATION_OVERLAY / TYPE_ACCESSIBILITY_OVERLAY).
@@ -103,6 +105,7 @@ object LockWindowOverlayManager {
                 activeOverlayView = view
                 activeWindowManager = wm
                 currentBlockedPackage = decision.packageName
+                ExpressiveFeedbackEngine.playInterceptionRejected(context)
                 Log.i(TAG, "Displayed system overlay barrier for ${decision.packageName}")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to display system overlay barrier", e)
@@ -146,11 +149,20 @@ object LockWindowOverlayManager {
         }
 
         val root = FrameLayout(context).apply {
-            setBackgroundColor(Color.parseColor("#121117"))
+            setBackgroundColor(Color.parseColor("#120F17"))
             isClickable = true
             isFocusable = true
-            setPadding(dp(24), dp(32), dp(24), dp(32))
         }
+
+        // 60fps Material 3 Expressive Red Cross Rain backdrop
+        val crossRainView = ExpressiveCrossRainOverlayView(context)
+        root.addView(
+            crossRainView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
 
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL

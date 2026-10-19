@@ -10,9 +10,10 @@ import androidx.room.RoomDatabase
         AppTimerRuleEntity::class,
         PinnedFocusAppEntity::class,
         FocusActiveConfigEntity::class,
-        FocusHistoryRecordEntity::class
+        FocusHistoryRecordEntity::class,
+        FocusExceptionAppEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class ChapterLockDatabase : RoomDatabase() {

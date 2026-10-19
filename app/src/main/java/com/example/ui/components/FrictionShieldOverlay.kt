@@ -46,12 +46,14 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +62,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.ExpressiveFeedbackEngine
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.viewmodel.ChallengeMode
 import com.example.viewmodel.FrictionChallengeState
@@ -78,7 +81,12 @@ fun FrictionShieldOverlay(
     onKeepLocked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
+
+    LaunchedEffect(challenge.targetPackageName, challenge.reason) {
+        ExpressiveFeedbackEngine.playInterceptionRejected(context)
+    }
 
     BackHandler {
         onKeepLocked()
@@ -128,7 +136,12 @@ fun FrictionShieldOverlay(
                 .imePadding(),
             contentAlignment = Alignment.Center
         ) {
-            val isTablet = maxWidth >= 700.dp
+            // Material 3 Expressive Red Cross Rain backdrop
+            ExpressiveRedCrossRain(
+                modifier = Modifier.fillMaxSize()
+            )
+
+            val isTablet = maxWidth >= 740.dp && maxWidth > maxHeight
 
             if (isTablet) {
                 // --- TABLET 2-PANE COGNITIVE GATE ---
@@ -227,24 +240,30 @@ fun FrictionShieldOverlay(
                     ) {
                         PuzzleModeSelectorBar(
                             currentMode = challenge.mode,
-                            onSwitchMode = onSwitchMode
+                            onSwitchMode = { mode ->
+                                ExpressiveFeedbackEngine.playPillTap(context)
+                                onSwitchMode(mode)
+                            }
                         )
 
                         ActivePuzzleContent(
                             challenge = challenge,
                             onTapMemoryTile = { index ->
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                ExpressiveFeedbackEngine.playSlotTick(context, 1.05f + (index % 5) * 0.06f)
                                 onTapMemoryTile(index)
                             },
-                            onReplayMemoryPattern = onReplayMemoryPattern,
+                            onReplayMemoryPattern = {
+                                ExpressiveFeedbackEngine.playPillTap(context)
+                                onReplayMemoryPattern()
+                            },
                             onMathInputChanged = onMathInputChanged,
                             onSubmitMathStep = {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                ExpressiveFeedbackEngine.playLockActivated(context)
                                 onSubmitMathStep()
                             },
                             onPhraseChanged = onPhraseChanged,
                             onConfirmPhraseUnlock = {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                ExpressiveFeedbackEngine.playLockActivated(context)
                                 onConfirmPhraseUnlock()
                             }
                         )
@@ -262,67 +281,80 @@ fun FrictionShieldOverlay(
                     verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
                     Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        shape = CircleShape
+                        color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.88f),
+                        shape = RoundedCornerShape(32.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Column(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Lock,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                shape = CircleShape
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = badgeLabel,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+
                             Text(
-                                text = badgeLabel,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                                text = title,
+                                style = MaterialTheme.typography.headlineLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            textAlign = TextAlign.Center
-                        )
-
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
                     PuzzleModeSelectorBar(
                         currentMode = challenge.mode,
-                        onSwitchMode = onSwitchMode
+                        onSwitchMode = { mode ->
+                            ExpressiveFeedbackEngine.playPillTap(context)
+                            onSwitchMode(mode)
+                        }
                     )
 
                     ActivePuzzleContent(
                         challenge = challenge,
                         onTapMemoryTile = { index ->
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            ExpressiveFeedbackEngine.playSlotTick(context, 1.05f + (index % 5) * 0.06f)
                             onTapMemoryTile(index)
                         },
-                        onReplayMemoryPattern = onReplayMemoryPattern,
+                        onReplayMemoryPattern = {
+                            ExpressiveFeedbackEngine.playPillTap(context)
+                            onReplayMemoryPattern()
+                        },
                         onMathInputChanged = onMathInputChanged,
                         onSubmitMathStep = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            ExpressiveFeedbackEngine.playLockActivated(context)
                             onSubmitMathStep()
                         },
                         onPhraseChanged = onPhraseChanged,
                         onConfirmPhraseUnlock = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            ExpressiveFeedbackEngine.playLockActivated(context)
                             onConfirmPhraseUnlock()
                         }
                     )

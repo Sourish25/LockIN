@@ -140,6 +140,17 @@ class ExampleRobolectricTest {
         val youtubeDecision = ChapterLockEnforcer.evaluatePackage("com.google.android.youtube", "com.example")
         assertNotNull(youtubeDecision)
         assertEquals(InterceptReason.FOCUS_LOCK_BREACH, youtubeDecision?.reason)
+
+        // Built-in emergency dialer must always be permitted during Focus Lock
+        val dialerDecision = ChapterLockEnforcer.evaluatePackage("com.google.android.dialer", "com.example")
+        assertNull("Emergency / Phone dialer must always be permitted during Focus Lock", dialerDecision)
+
+        // User-added exception apps (e.g. GPay) must be permitted during Focus Lock
+        val gpayPkg = "com.google.android.apps.nbu.paisa.user"
+        ChapterLockEnforcer.syncFocusExceptions(setOf(gpayPkg))
+        val gpayDecision = ChapterLockEnforcer.evaluatePackage(gpayPkg, "com.example")
+        assertNull("User-configured exception app (GPay) must be permitted during Focus Lock", gpayDecision)
+        ChapterLockEnforcer.syncFocusExceptions(emptySet())
     }
 
     @Test
@@ -364,7 +375,7 @@ class ExampleRobolectricTest {
             userClickedSequence = listOf(2, 5),
             currentlyFlashingTile = 10,
             isRevealingPattern = false,
-            gridStatusMessage = "Tap the 5 tiles in exact order (2 / 5)",
+            gridStatusMessage = "Tap 5 tiles in order (2/5)",
             mathSteps = listOf(MathStepProblem(1, 3, "(18 × 6) + 27", 135))
         )
 
@@ -537,6 +548,49 @@ class ExampleRobolectricTest {
         saveScreenshot("tablet_app_limits_layout.png")
     }
 
+    @Test
+    @Config(qualifiers = "w768dp-h1024dp-xhdpi")
+    fun `portrait tablet uses centered single-column layout and slot-machine clock displays real-time seconds`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val readerApp = PinnedFocusAppEntity(
+            packageName = "com.flyersoft.moonreader",
+            appName = "Moon+ Reader",
+            subtitle = "Installed Reader",
+            isSelected = true,
+            totalFocusedMinutes = 185,
+            isInstalled = true
+        )
+        val idleSession = ActiveFocusSessionState(
+            isActive = false,
+            pinnedAppName = "Moon+ Reader",
+            pinnedPackageName = "com.flyersoft.moonreader",
+            selectedDurationMinutes = 90,
+            totalSeconds = 5400,
+            remainingSeconds = 5400
+        )
+
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                Box(modifier = Modifier.size(width = 768.dp, height = 1024.dp)) {
+                    ReadAndLockScreen(
+                        selectedFocusApp = readerApp,
+                        activeSession = idleSession,
+                        focusHistoryCount = 4,
+                        isTablet = false,
+                        onSelectDuration = {},
+                        onStartFocusLock = {},
+                        onLaunchPinnedApp = {},
+                        onRequestQuitFocusEarly = {},
+                        onOpenSelectFocusAppSheet = {}
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(1000L)
+        composeTestRule.onNodeWithTag("slot_machine_clock_display").assertIsDisplayed()
+        saveScreenshot("portrait_tablet_focus_lock.png")
+    }
+
     private fun saveScreenshot(fileName: String) {
         val node = composeTestRule.onRoot().fetchSemanticsNode()
         val view = (node.root as ViewRootForTest).view
@@ -559,3 +613,4 @@ class ExampleRobolectricTest {
         assertTrue("Screenshot $fileName must exist and be non-empty", outFile.exists() && outFile.length() > 1000)
     }
 }
+

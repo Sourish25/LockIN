@@ -37,7 +37,7 @@ object ChapterLockEnforcer {
     private val temporaryUnlocks = ConcurrentHashMap<String, Long>() // packageName -> unlockUntilEpochMs
     private val knownAppLabels = ConcurrentHashMap<String, String>()
 
-    // Strictly essential OS packages (Launchers, SystemUI, Keyboards, Permission dialogs)
+    // Strictly essential OS & emergency packages (Launchers, SystemUI, Keyboards, Dialer/InCallUI, Permission dialogs)
     private val whitelistedPackages = setOf(
         "android",
         "com.android.systemui",
@@ -56,7 +56,15 @@ object ChapterLockEnforcer {
         "com.google.android.packageinstaller",
         "com.android.packageinstaller",
         "com.google.android.permissioncontroller",
-        "com.android.permissioncontroller"
+        "com.android.permissioncontroller",
+        "com.google.android.dialer",
+        "com.android.dialer",
+        "com.android.incallui",
+        "com.samsung.android.incallui",
+        "com.android.server.telecom",
+        "com.android.phone",
+        "com.android.emergency",
+        "com.miui.vpservice"
     )
 
     private val settingsPackages = setOf(
@@ -65,8 +73,22 @@ object ChapterLockEnforcer {
         "com.miui.cleanmaster"
     )
 
+    // User-configured Focus Lock exception apps (e.g., GPay, Phone, WhatsApp, Authenticator)
+    private val allowedFocusExceptionPackages = ConcurrentHashMap.newKeySet<String>()
+
     private val lastInterceptTime = AtomicLong(0L)
     private val lastInterceptedPkg = AtomicReference<String?>(null)
+
+    fun syncFocusExceptions(packages: Collection<String>) {
+        allowedFocusExceptionPackages.clear()
+        allowedFocusExceptionPackages.addAll(packages.map { it.trim() }.filter { it.isNotEmpty() })
+    }
+
+    fun isFocusExceptionPackage(packageName: String): Boolean =
+        allowedFocusExceptionPackages.contains(packageName.trim())
+
+    fun getFocusExceptionPackages(): Set<String> =
+        allowedFocusExceptionPackages.toSet()
 
     fun updateFocusLockState(
         active: Boolean,
@@ -131,7 +153,8 @@ object ChapterLockEnforcer {
         if (whitelistedPackages.contains(cleanPkg)) return null
         if (cleanPkg.contains("inputmethod", ignoreCase = true) ||
             cleanPkg.contains("keyboard", ignoreCase = true) ||
-            cleanPkg.contains(".launcher", ignoreCase = true)
+            cleanPkg.contains(".launcher", ignoreCase = true) ||
+            cleanPkg.contains("incallui", ignoreCase = true)
         ) {
             return null
         }
@@ -143,12 +166,13 @@ object ChapterLockEnforcer {
 
         if (isPackageTemporarilyUnlocked(cleanPkg)) return null
 
-        // 1. Check Focus Lock (blocks all non-whitelisted apps except the pinned focus app)
+        // 1. Check Focus Lock (blocks all non-whitelisted apps except the pinned focus app and user-added exception apps)
         if (isFocusLockActive.get()) {
             val endTime = focusLockEndTimeMs.get()
             if (now < endTime) {
                 val allowedReaderPkg = pinnedFocusPackage.get()
-                if (!allowedReaderPkg.isNullOrBlank() && cleanPkg != allowedReaderPkg) {
+                val isAllowedException = allowedFocusExceptionPackages.contains(cleanPkg)
+                if (!allowedReaderPkg.isNullOrBlank() && cleanPkg != allowedReaderPkg && !isAllowedException) {
                     val appName = appRulesMap[cleanPkg]?.appName
                         ?: knownAppLabels[cleanPkg]
                         ?: formatFallbackPackageName(cleanPkg)

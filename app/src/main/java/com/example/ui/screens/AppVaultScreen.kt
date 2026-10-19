@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -63,6 +64,8 @@ import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LockInMotion
 import com.example.ui.theme.expressiveClickable
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+
 @Composable
 fun AppVaultScreen(
     appRules: List<AppTimerRuleEntity>,
@@ -78,6 +81,7 @@ fun AppVaultScreen(
     onOpenUsageAccessSettings: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit = {},
+    onOpenAppDetailsSettings: () -> Unit = {},
     onOpenPermissionsSheet: () -> Unit,
     onTapAppRule: (AppTimerRuleEntity) -> Unit,
     onRequestUnlockApp: (AppTimerRuleEntity) -> Unit,
@@ -109,23 +113,31 @@ fun AppVaultScreen(
             .take(3)
     }
 
-    if (isTablet) {
-        // --- TABLET 2-PANE ADAPTIVE LAYOUT ---
-        Row(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp)
-                .testTag("app_vault_screen"),
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // Left Pane: Hero Daily Budget Card + Active Focus Banner + Missing Permissions + Quick Add Used Apps
-            Column(
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag("app_vault_screen")
+    ) {
+        // Use 2-pane split ONLY when tablet is in wide landscape orientation;
+        // Portrait/vertical tablets use the spacious single-column flow so cards never get crushed.
+        val useTwoPane = isTablet && maxWidth >= 740.dp && maxWidth > maxHeight
+
+        if (useTwoPane) {
+            // --- LANDSCAPE TABLET 2-PANE ADAPTIVE LAYOUT ---
+            Row(
                 modifier = Modifier
-                    .weight(0.42f)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .fillMaxSize()
+                    .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
+                // Left Pane: Hero Daily Budget Card + Active Focus Banner + Missing Permissions + Quick Add Used Apps
+                Column(
+                    modifier = Modifier
+                        .weight(0.44f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                 // Hero Bento Card
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
@@ -279,6 +291,7 @@ fun AppVaultScreen(
                         onOpenUsageAccessSettings = onOpenUsageAccessSettings,
                         onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                         onOpenOverlaySettings = onOpenOverlaySettings,
+                        onOpenAppDetailsSettings = onOpenAppDetailsSettings,
                         onOpenPermissionsSheet = onOpenPermissionsSheet
                     )
                 }
@@ -321,13 +334,19 @@ fun AppVaultScreen(
                             Text(
                                 text = "CONFIGURED LIMITS",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "${activeRules.size} WITHIN LIMIT • ${blockedRules.size} LOCKED",
                                 fontFamily = JetBrainsMonoFontFamily,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -382,16 +401,27 @@ fun AppVaultScreen(
                     }
                 }
             }
-        }
-    } else {
-        // --- PHONE SINGLE COLUMN ADAPTIVE LAYOUT ---
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .testTag("app_vault_screen"),
-            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 112.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+            }
+        } else {
+            // --- PHONE & PORTRAIT TABLET SPACIOUS SINGLE-COLUMN LAYOUT ---
+            val isWidePortrait = maxWidth >= 600.dp
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .widthIn(max = 720.dp)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(
+                        start = if (isWidePortrait) 28.dp else 18.dp,
+                        end = if (isWidePortrait) 28.dp else 18.dp,
+                        top = 8.dp,
+                        bottom = 112.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
             // Asymmetric Split Bento Header
             item {
                 val count = if (blockedRules.isNotEmpty()) blockedRules.size else appRules.size
@@ -415,34 +445,21 @@ fun AppVaultScreen(
                             .fillMaxHeight()
                     ) {
                         Column(
-                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            Surface(
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.14f),
+                                shape = CircleShape
                             ) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
-                                    shape = CircleShape
-                                ) {
-                                    Text(
-                                        text = if (blockedRules.isNotEmpty()) "LIMIT REACHED" else "DAILY BUDGET",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                                    )
-                                }
-
-                                if (totalUsedMinutesToday > 0) {
-                                    Text(
-                                        text = "${formatMinutesClean(totalUsedMinutesToday)} used",
-                                        fontFamily = JetBrainsMonoFontFamily,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                    )
-                                }
+                                Text(
+                                    text = if (blockedRules.isNotEmpty()) "LIMIT REACHED" else "DAILY BUDGET",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                )
                             }
 
                             Row(
@@ -458,8 +475,8 @@ fun AppVaultScreen(
                                         text = "$targetCount",
                                         fontFamily = JetBrainsMonoFontFamily,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 52.sp,
-                                        lineHeight = 52.sp,
+                                        fontSize = 50.sp,
+                                        lineHeight = 50.sp,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                 }
@@ -471,8 +488,19 @@ fun AppVaultScreen(
                                     },
                                     style = MaterialTheme.typography.titleMedium,
                                     lineHeight = 18.sp,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
-                                    modifier = Modifier.padding(bottom = 6.dp)
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.88f),
+                                    modifier = Modifier.padding(bottom = 5.dp)
+                                )
+                            }
+
+                            if (totalUsedMinutesToday > 0) {
+                                Text(
+                                    text = "${formatMinutesClean(totalUsedMinutesToday)} used today",
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.80f)
                                 )
                             }
                         }
@@ -547,7 +575,7 @@ fun AppVaultScreen(
                 }
             }
 
-            // Missing Permissions Banner — ONLY shown when at least 1 permission is not yet granted!
+            // Missing Permissions Banner — ONLY shown when at least 1 of the 3 core permissions is not yet granted!
             if (!allCorePermissionsGranted) {
                 item {
                     MissingPermissionsCard(
@@ -557,6 +585,7 @@ fun AppVaultScreen(
                         onOpenUsageAccessSettings = onOpenUsageAccessSettings,
                         onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                         onOpenOverlaySettings = onOpenOverlaySettings,
+                        onOpenAppDetailsSettings = onOpenAppDetailsSettings,
                         onOpenPermissionsSheet = onOpenPermissionsSheet
                     )
                 }
@@ -623,6 +652,8 @@ fun AppVaultScreen(
                             onQuickAddAppLimit(app, mins)
                         }
                     )
+                }
+            }
                 }
             }
         }
@@ -762,6 +793,7 @@ private fun MissingPermissionsCard(
     onOpenUsageAccessSettings: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
+    onOpenAppDetailsSettings: () -> Unit = {},
     onOpenPermissionsSheet: () -> Unit
 ) {
     val missingCount = listOf(
@@ -790,7 +822,8 @@ private fun MissingPermissionsCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Shield,
@@ -802,19 +835,30 @@ private fun MissingPermissionsCard(
                         text = if (missingCount == 1) "1 PERMISSION NEEDED"
                         else "$missingCount PERMISSIONS NEEDED",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Text(
-                    text = "All Settings",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    shape = CircleShape,
                     modifier = Modifier
                         .clip(CircleShape)
                         .expressiveClickable { onOpenPermissionsSheet() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
+                ) {
+                    Text(
+                        text = "All Settings",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
             }
 
             if (!hasAccessibilityPermission) {
@@ -823,6 +867,51 @@ private fun MissingPermissionsCard(
                     subtitle = "Required to intercept apps when switching",
                     onClick = onOpenAccessibilitySettings
                 )
+                // Android 13-16 Restricted Settings / Play Protect Sideload Unlock Helper
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .expressiveClickable { onOpenAppDetailsSettings() }
+                        .testTag("unlock_restricted_settings_row")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Toggle blocked or 'Restricted setting'?",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = "Tap App Info -> top-right ⋮ menu -> Allow restricted settings",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            shape = CircleShape
+                        ) {
+                            Text(
+                                text = "App Info",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
             }
 
             if (!hasUsageStatsPermission) {
@@ -917,13 +1006,19 @@ private fun QuickLimitSuggestionsCard(
                 Text(
                     text = "QUICK ADD LIMIT",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "1-TAP 30M CAP",
                     fontFamily = JetBrainsMonoFontFamily,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = MaterialTheme.colorScheme.tertiary,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 

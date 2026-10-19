@@ -1,12 +1,19 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,8 +25,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -47,22 +56,64 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AppTimerRuleEntity
 import com.example.data.DiscoveredDeviceApp
+import com.example.data.FocusExceptionAppEntity
 import com.example.data.PinnedFocusAppEntity
 import com.example.data.RealAppIcon
 import com.example.data.formatMinutesClean
+import com.example.ui.theme.ExpressiveFeedbackEngine
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LockInMotion
 import com.example.ui.theme.expressiveClickable
 
-private val DAILY_LIMIT_PRESETS = listOf(1, 5, 10, 15, 30, 45, 60, 90, 120, 180)
+private val DAILY_LIMIT_PRESET_ROWS = listOf(
+    listOf(1, 5, 10, 15, 30),
+    listOf(45, 60, 90, 120, 180)
+)
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+/**
+ * Isolates child LazyColumn / vertical scroll gestures from ModalBottomSheet's internal
+ * drag-to-dismiss nested scroll handler so scrolling downward inside an app list
+ * NEVER drags or closes the bottom sheet.
+ */
+@Composable
+private fun rememberSheetScrollIsolationConnection(): NestedScrollConnection {
+    return remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                // Consume all remaining vertical scroll delta so ModalBottomSheet never drags down
+                return Offset(0f, available.y)
+            }
+
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity
+            ): Velocity {
+                // Consume all remaining vertical fling velocity so downward flings never dismiss sheet
+                return Velocity(0f, available.y)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditAppLimitBottomSheet(
     rule: AppTimerRuleEntity?,
@@ -72,12 +123,15 @@ fun EditAppLimitBottomSheet(
 ) {
     if (rule == null) return
 
+    val context = LocalContext.current
+    val scrollIsolation = rememberSheetScrollIsolationConnection()
     var selectedMinutes by remember(rule.dailyLimitMinutes) {
         mutableIntStateOf(rule.dailyLimitMinutes.coerceAtLeast(1))
     }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetMaxWidth = 600.dp,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
@@ -85,9 +139,12 @@ fun EditAppLimitBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 560.dp)
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .nestedScroll(scrollIsolation)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { change, _ -> change.consume() }
+                }
+                .padding(horizontal = 24.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -111,11 +168,13 @@ fun EditAppLimitBottomSheet(
                         )
                     }
 
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = rule.appName,
                             style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${formatMinutesClean(rule.usedMinutesToday)} used today",
@@ -125,20 +184,31 @@ fun EditAppLimitBottomSheet(
                     }
                 }
 
+                Spacer(modifier = Modifier.width(12.dp))
+
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     shape = CircleShape
                 ) {
                     AnimatedContent(
                         targetState = selectedMinutes,
-                        transitionSpec = { LockInMotion.numericCounterTransition() },
+                        transitionSpec = {
+                            val rollDown = targetState < initialState
+                            if (rollDown) {
+                                (slideInVertically { -it } + fadeIn()) togetherWith
+                                        (slideOutVertically { it } + fadeOut())
+                            } else {
+                                (slideInVertically { it } + fadeIn()) togetherWith
+                                        (slideOutVertically { -it } + fadeOut())
+                            }
+                        },
                         label = "edit_limit_badge"
                     ) { mins ->
                         Text(
                             text = formatMinutesClean(mins),
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
+                            fontSize = 17.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
                         )
@@ -149,7 +219,16 @@ fun EditAppLimitBottomSheet(
             FineTuneMinutesRow(
                 selectedMinutes = selectedMinutes,
                 usedMinutesToday = rule.usedMinutesToday,
-                onAdjust = { newMins -> selectedMinutes = newMins.coerceIn(1, 360) }
+                onAdjust = { newMins ->
+                    val clamped = newMins.coerceIn(1, 360)
+                    if (clamped != selectedMinutes) {
+                        ExpressiveFeedbackEngine.playSlotTick(
+                            context,
+                            if (clamped > selectedMinutes) 1.15f else 0.9f
+                        )
+                        selectedMinutes = clamped
+                    }
+                }
             )
 
             Text(
@@ -158,36 +237,15 @@ fun EditAppLimitBottomSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DAILY_LIMIT_PRESETS.forEach { mins ->
-                    val chosen = selectedMinutes == mins
-                    Surface(
-                        color = if (chosen) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .height(44.dp)
-                            .clip(CircleShape)
-                            .expressiveClickable { selectedMinutes = mins }
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = formatMinutesClean(mins),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = if (chosen) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+            PresetMinutesGrid(
+                selectedMinutes = selectedMinutes,
+                onSelectMinutes = { mins ->
+                    if (mins != selectedMinutes) {
+                        ExpressiveFeedbackEngine.playPillTap(context)
+                        selectedMinutes = mins
                     }
                 }
-            }
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -200,7 +258,7 @@ fun EditAppLimitBottomSheet(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     ),
-                    modifier = Modifier.height(58.dp)
+                    modifier = Modifier.height(56.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.DeleteOutline,
@@ -209,11 +267,14 @@ fun EditAppLimitBottomSheet(
                 }
 
                 Button(
-                    onClick = { onSaveLimit(selectedMinutes) },
+                    onClick = {
+                        ExpressiveFeedbackEngine.playLockActivated(context)
+                        onSaveLimit(selectedMinutes)
+                    },
                     shape = CircleShape,
                     modifier = Modifier
                         .weight(1f)
-                        .height(58.dp)
+                        .height(56.dp)
                         .testTag("save_app_limit_button")
                 ) {
                     Text(
@@ -224,7 +285,64 @@ fun EditAppLimitBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun PresetMinutesGrid(
+    selectedMinutes: Int,
+    onSelectMinutes: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        DAILY_LIMIT_PRESET_ROWS.forEach { rowPresets ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowPresets.forEach { mins ->
+                    val chosen = selectedMinutes == mins
+                    val cornerRadius by animateDpAsState(
+                        targetValue = if (chosen) 14.dp else 22.dp,
+                        animationSpec = LockInMotion.subtleBounceSpring(),
+                        label = "PresetCorner_$mins"
+                    )
+                    val bgColor by animateColorAsState(
+                        targetValue = if (chosen) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        animationSpec = LockInMotion.spatialSpring(),
+                        label = "PresetBg_$mins"
+                    )
+
+                    Surface(
+                        color = bgColor,
+                        shape = RoundedCornerShape(cornerRadius),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(cornerRadius))
+                            .expressiveClickable { onSelectMinutes(mins) }
+                            .testTag("preset_minutes_$mins")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = formatMinutesClean(mins),
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (chosen) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -246,7 +364,7 @@ private fun FineTuneMinutesRow(
                 shape = CircleShape,
                 modifier = Modifier
                     .weight(1f)
-                    .height(40.dp)
+                    .height(42.dp)
                     .clip(CircleShape)
                     .expressiveClickable { onAdjust(selectedMinutes + delta) }
             ) {
@@ -267,12 +385,12 @@ private fun FineTuneMinutesRow(
                 color = MaterialTheme.colorScheme.tertiaryContainer,
                 shape = CircleShape,
                 modifier = Modifier
-                    .height(40.dp)
+                    .height(42.dp)
                     .clip(CircleShape)
                     .expressiveClickable { onAdjust(usedMinutesToday.coerceAtLeast(1)) }
             ) {
                 Box(
-                    modifier = Modifier.padding(horizontal = 12.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -280,7 +398,9 @@ private fun FineTuneMinutesRow(
                         fontFamily = JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }
@@ -288,7 +408,7 @@ private fun FineTuneMinutesRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddAppTimerBottomSheet(
     isVisible: Boolean,
@@ -304,6 +424,8 @@ fun AddAppTimerBottomSheet(
 ) {
     if (!isVisible) return
 
+    val context = LocalContext.current
+    val scrollIsolation = rememberSheetScrollIsolationConnection()
     var searchQuery by remember { mutableStateOf("") }
     var selectedPackage by remember { mutableStateOf<DiscoveredDeviceApp?>(null) }
     var selectedMinutes by remember { mutableIntStateOf(60) }
@@ -322,6 +444,7 @@ fun AddAppTimerBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetMaxWidth = 600.dp,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
@@ -329,9 +452,12 @@ fun AddAppTimerBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 560.dp)
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .nestedScroll(scrollIsolation)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { change, _ -> change.consume() }
+                }
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -350,7 +476,16 @@ fun AddAppTimerBottomSheet(
                 ) {
                     AnimatedContent(
                         targetState = selectedMinutes,
-                        transitionSpec = { LockInMotion.numericCounterTransition() },
+                        transitionSpec = {
+                            val rollDown = targetState < initialState
+                            if (rollDown) {
+                                (slideInVertically { -it } + fadeIn()) togetherWith
+                                        (slideOutVertically { it } + fadeOut())
+                            } else {
+                                (slideInVertically { it } + fadeIn()) togetherWith
+                                        (slideOutVertically { -it } + fadeOut())
+                            }
+                        },
                         label = "add_limit_badge"
                     ) { mins ->
                         Text(
@@ -359,7 +494,7 @@ fun AddAppTimerBottomSheet(
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp)
                         )
                     }
                 }
@@ -389,15 +524,17 @@ fun AddAppTimerBottomSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Scrollable List of Installed Apps
+            // Scroll-Isolated List of Installed Apps (uses contentPadding so rows never clip)
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 220.dp)
+                    .height(228.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .nestedScroll(scrollIsolation)
+                    .testTag("add_app_limit_list"),
+                contentPadding = PaddingValues(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(filteredApps, key = { it.packageName }) { app ->
                     val isSelected = selectedPackage?.packageName == app.packageName
@@ -408,7 +545,10 @@ fun AddAppTimerBottomSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(18.dp))
-                            .expressiveClickable { selectedPackage = app }
+                            .expressiveClickable {
+                                ExpressiveFeedbackEngine.playPillTap(context)
+                                selectedPackage = app
+                            }
                     ) {
                         Row(
                             modifier = Modifier
@@ -434,12 +574,14 @@ fun AddAppTimerBottomSheet(
                                     )
                                 }
 
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = app.appName,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                        else MaterialTheme.colorScheme.onSurface
+                                        else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = if (app.usedMinutesToday > 0) {
@@ -449,7 +591,9 @@ fun AddAppTimerBottomSheet(
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -469,44 +613,33 @@ fun AddAppTimerBottomSheet(
             FineTuneMinutesRow(
                 selectedMinutes = selectedMinutes,
                 usedMinutesToday = selectedPackage?.usedMinutesToday ?: 0,
-                onAdjust = { newMins -> selectedMinutes = newMins.coerceIn(1, 360) }
-            )
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DAILY_LIMIT_PRESETS.forEach { mins ->
-                    val chosen = selectedMinutes == mins
-                    Surface(
-                        color = if (chosen) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .height(42.dp)
-                            .clip(CircleShape)
-                            .expressiveClickable { selectedMinutes = mins }
-                            .testTag("preset_minutes_$mins")
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = formatMinutesClean(mins),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = if (chosen) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                onAdjust = { newMins ->
+                    val clamped = newMins.coerceIn(1, 360)
+                    if (clamped != selectedMinutes) {
+                        ExpressiveFeedbackEngine.playSlotTick(
+                            context,
+                            if (clamped > selectedMinutes) 1.15f else 0.9f
+                        )
+                        selectedMinutes = clamped
                     }
                 }
-            }
+            )
+
+            // Symmetric 5x2 Preset Pill Matrix (no orphan 2-pill wrap row)
+            PresetMinutesGrid(
+                selectedMinutes = selectedMinutes,
+                onSelectMinutes = { mins ->
+                    if (mins != selectedMinutes) {
+                        ExpressiveFeedbackEngine.playPillTap(context)
+                        selectedMinutes = mins
+                    }
+                }
+            )
 
             Button(
                 onClick = {
                     val chosenApp = selectedPackage ?: return@Button
+                    ExpressiveFeedbackEngine.playLockActivated(context)
                     onAddAppRule(
                         chosenApp.packageName,
                         chosenApp.appName,
@@ -518,7 +651,7 @@ fun AddAppTimerBottomSheet(
                 shape = CircleShape,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(58.dp)
+                    .height(56.dp)
                     .testTag("confirm_add_app_timer_button")
             ) {
                 Text(
@@ -528,11 +661,13 @@ fun AddAppTimerBottomSheet(
                         "Select an app above"
                     },
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
@@ -549,6 +684,8 @@ fun SelectFocusAppBottomSheet(
 ) {
     if (!isVisible) return
 
+    val context = LocalContext.current
+    val scrollIsolation = rememberSheetScrollIsolationConnection()
     var searchQuery by remember { mutableStateOf("") }
 
     val allReaderCandidates = remember(pinnedFocusApps, discoveredApps, searchQuery) {
@@ -577,6 +714,7 @@ fun SelectFocusAppBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetMaxWidth = 600.dp,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
@@ -584,9 +722,12 @@ fun SelectFocusAppBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 560.dp)
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .nestedScroll(scrollIsolation)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { change, _ -> change.consume() }
+                }
+                .padding(horizontal = 24.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -595,7 +736,7 @@ fun SelectFocusAppBottomSheet(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "During Focus Lock, only this app is allowed in the foreground. Switching to any other app triggers the lock barrier.",
+                    text = "During Focus Lock, only this app (plus your Allowed Exception Apps) can stay open in the foreground.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -627,18 +768,23 @@ fun SelectFocusAppBottomSheet(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 300.dp),
+                    .height(290.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .nestedScroll(scrollIsolation),
+                contentPadding = PaddingValues(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(allReaderCandidates, key = { it.packageName }) { app ->
                     Surface(
                         color = if (app.isSelected) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = RoundedCornerShape(22.dp),
+                        else MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = RoundedCornerShape(20.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(22.dp))
+                            .clip(RoundedCornerShape(20.dp))
                             .expressiveClickable {
+                                ExpressiveFeedbackEngine.playPillTap(context)
                                 if (pinnedFocusApps.any { it.packageName == app.packageName }) {
                                     onSelectFocusApp(app.packageName)
                                 } else {
@@ -649,7 +795,7 @@ fun SelectFocusAppBottomSheet(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -660,28 +806,32 @@ fun SelectFocusAppBottomSheet(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(48.dp)
+                                        .size(46.dp)
                                         .clip(RoundedCornerShape(14.dp))
                                 ) {
                                     RealAppIcon(
                                         packageName = app.packageName,
                                         appName = app.appName,
-                                        modifier = Modifier.size(48.dp)
+                                        modifier = Modifier.size(46.dp)
                                     )
                                 }
 
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = app.appName,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = if (app.isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                        else MaterialTheme.colorScheme.onSurface
+                                        else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = app.subtitle,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = if (app.isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -698,7 +848,250 @@ fun SelectFocusAppBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SelectFocusExceptionsBottomSheet(
+    isVisible: Boolean,
+    exceptionApps: List<FocusExceptionAppEntity>,
+    discoveredApps: List<DiscoveredDeviceApp>,
+    pinnedFocusPackageName: String = "",
+    onDismiss: () -> Unit,
+    onToggleExceptionApp: (String, String, String) -> Unit
+) {
+    if (!isVisible) return
+
+    val context = LocalContext.current
+    val scrollIsolation = rememberSheetScrollIsolationConnection()
+    var searchQuery by remember { mutableStateOf("") }
+    val selectedPackages = remember(exceptionApps) {
+        exceptionApps.map { it.packageName }.toSet()
+    }
+
+    val candidateApps = remember(discoveredApps, exceptionApps, searchQuery, pinnedFocusPackageName) {
+        val merged = mutableMapOf<String, DiscoveredDeviceApp>()
+        discoveredApps.forEach { app ->
+            if (app.packageName != pinnedFocusPackageName) {
+                merged[app.packageName] = app
+            }
+        }
+        exceptionApps.forEach { exc ->
+            if (!merged.containsKey(exc.packageName) && exc.packageName != pinnedFocusPackageName) {
+                merged[exc.packageName] = DiscoveredDeviceApp(
+                    packageName = exc.packageName,
+                    appName = exc.appName,
+                    category = exc.category,
+                    isInstalledOnDevice = true
+                )
+            }
+        }
+
+        merged.values
+            .filter {
+                searchQuery.isBlank() ||
+                        it.appName.contains(searchQuery, ignoreCase = true) ||
+                        it.category.contains(searchQuery, ignoreCase = true) ||
+                        it.packageName.contains(searchQuery, ignoreCase = true)
+            }
+            .sortedWith(
+                compareByDescending<DiscoveredDeviceApp> { it.packageName in selectedPackages }
+                    .thenByDescending {
+                        it.category == "Payments & Banking" || it.category == "Emergency & Calls"
+                    }
+                    .thenBy { it.appName.lowercase() }
+            )
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetMaxWidth = 600.dp,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .nestedScroll(scrollIsolation)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { change, _ -> change.consume() }
+                }
+                .padding(horizontal = 24.dp, vertical = 10.dp)
+                .testTag("select_focus_exceptions_sheet"),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Allowed Exception Apps",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Choose essential apps (such as Google Pay, Wallet, Phone, Authenticator, or Maps) that you can open freely during Focus Lock without triggering the puzzle barrier.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Built-in safety: System Phone Dialer & Emergency Calls are always allowed automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+            }
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search GPay, Phone, Wallet, Maps, WhatsApp...") },
+                leadingIcon = {
+                    Icon(imageVector = Icons.Filled.Search, contentDescription = null)
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(imageVector = Icons.Filled.Clear, contentDescription = "Clear")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .nestedScroll(scrollIsolation),
+                contentPadding = PaddingValues(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(candidateApps, key = { it.packageName }) { app ->
+                    val isAllowed = app.packageName in selectedPackages
+                    Surface(
+                        color = if (isAllowed) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .expressiveClickable {
+                                ExpressiveFeedbackEngine.playPillTap(context)
+                                onToggleExceptionApp(app.packageName, app.appName, app.category)
+                            }
+                            .testTag("toggle_exception_app_${app.packageName}")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                ) {
+                                    RealAppIcon(
+                                        packageName = app.packageName,
+                                        appName = app.appName,
+                                        modifier = Modifier.size(44.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = app.appName,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = if (isAllowed) MaterialTheme.colorScheme.onPrimaryContainer
+                                        else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = if (isAllowed) "Allowed during Focus Lock • ${app.category}"
+                                        else app.category,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (isAllowed) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                color = if (isAllowed) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                shape = CircleShape
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    if (isAllowed) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Check,
+                                            contentDescription = "Allowed",
+                                            tint = MaterialTheme.colorScheme.primaryContainer,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = if (isAllowed) "Allowed" else "Allow",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isAllowed) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Button(
+                onClick = {
+                    ExpressiveFeedbackEngine.playPillTap(context)
+                    onDismiss()
+                },
+                shape = CircleShape,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+            ) {
+                Text(
+                    text = "Done (${exceptionApps.size} Allowed)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }
@@ -717,14 +1110,18 @@ fun SystemPermissionsBottomSheet(
     onOpenUsageAccess: () -> Unit,
     onOpenAccessibility: () -> Unit,
     onOpenOverlay: () -> Unit,
+    onOpenAppDetailsSettings: (() -> Unit)? = null,
     onOpenNotifications: (() -> Unit)? = null,
     onOpenBatteryOptimization: () -> Unit,
     onOpenXiaomiAutostart: (() -> Unit)?
 ) {
     if (!isVisible) return
 
+    val scrollIsolation = rememberSheetScrollIsolationConnection()
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetMaxWidth = 600.dp,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
@@ -732,9 +1129,10 @@ fun SystemPermissionsBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 560.dp)
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .nestedScroll(scrollIsolation)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -746,6 +1144,17 @@ fun SystemPermissionsBottomSheet(
                     text = "Grant these Android permissions to ensure LockIN stays active in the background, sends timer alerts, and intercepts apps immediately.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Android 13-16 Restricted Settings / Play Protect Sideload Unlock Helper
+            if ((!hasAccessibility || !hasOverlay) && onOpenAppDetailsSettings != null) {
+                PermissionRowCard(
+                    title = "Unlock 'Restricted Settings' (Android 13+)",
+                    subtitle = "If Accessibility is greyed out: tap App Info -> top-right ⋮ menu -> Allow restricted settings",
+                    isGranted = false,
+                    onGrantClick = onOpenAppDetailsSettings,
+                    buttonLabel = "App Info"
                 )
             }
 
@@ -807,7 +1216,7 @@ fun SystemPermissionsBottomSheet(
                 shape = CircleShape,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(54.dp)
             ) {
                 Text(
                     text = "Close",
@@ -816,7 +1225,7 @@ fun SystemPermissionsBottomSheet(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }

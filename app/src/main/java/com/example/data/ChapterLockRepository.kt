@@ -13,6 +13,7 @@ class ChapterLockRepository(
     val pinnedFocusAppsFlow: Flow<List<PinnedFocusAppEntity>> = dao.observePinnedFocusApps()
     val focusConfigFlow: Flow<FocusActiveConfigEntity?> = dao.observeFocusConfig()
     val focusHistoryFlow: Flow<List<FocusHistoryRecordEntity>> = dao.observeFocusHistory()
+    val focusExceptionAppsFlow: Flow<List<FocusExceptionAppEntity>> = dao.observeFocusExceptionApps()
 
     fun hasUsageStatsPermission(): Boolean = systemInspector.hasUsageStatsPermission()
     fun hasAccessibilityPermission(): Boolean = systemInspector.hasAccessibilityPermission()
@@ -23,31 +24,43 @@ class ChapterLockRepository(
 
     fun createUsageAccessIntent(): Intent {
         ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        LockWindowOverlayManager.dismiss()
         return systemInspector.createUsageAccessSettingsIntent()
     }
 
     fun createAccessibilitySettingsIntent(): Intent {
         ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        LockWindowOverlayManager.dismiss()
         return systemInspector.createAccessibilitySettingsIntent()
     }
 
     fun createOverlaySettingsIntent(): Intent {
         ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        LockWindowOverlayManager.dismiss()
         return systemInspector.createOverlaySettingsIntent()
+    }
+
+    fun createAppDetailsSettingsIntent(): Intent {
+        ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        LockWindowOverlayManager.dismiss()
+        return systemInspector.createAppDetailsSettingsIntent()
     }
 
     fun createNotificationSettingsIntent(): Intent {
         ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        LockWindowOverlayManager.dismiss()
         return systemInspector.createNotificationSettingsIntent()
     }
 
     fun createBatteryOptimizationIntent(): Intent {
         ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        LockWindowOverlayManager.dismiss()
         return systemInspector.createBatteryOptimizationIntent()
     }
 
     fun createXiaomiAutostartIntent(): Intent? {
         ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        LockWindowOverlayManager.dismiss()
         return systemInspector.createXiaomiAutostartIntent()
     }
 
@@ -150,7 +163,9 @@ class ChapterLockRepository(
     private suspend fun syncEnforcerState() {
         val rules = dao.getAllAppRulesOnce()
         val config = dao.getFocusConfigOnce()
+        val exceptions = dao.getFocusExceptionAppsOnce()
         ChapterLockEnforcer.syncRules(rules)
+        ChapterLockEnforcer.syncFocusExceptions(exceptions.map { it.packageName })
         if (config != null) {
             ChapterLockEnforcer.updateFocusLockState(
                 active = config.isStillActive(),
@@ -159,6 +174,31 @@ class ChapterLockRepository(
                 endTimeMs = config.endTimeEpochMs
             )
         }
+    }
+
+    suspend fun toggleFocusExceptionApp(
+        packageName: String,
+        appName: String,
+        category: String
+    ) {
+        val existing = dao.getFocusExceptionAppsOnce().any { it.packageName == packageName }
+        if (existing) {
+            dao.deleteFocusExceptionApp(packageName)
+        } else {
+            dao.upsertFocusExceptionApp(
+                FocusExceptionAppEntity(
+                    packageName = packageName,
+                    appName = appName,
+                    category = category
+                )
+            )
+        }
+        syncEnforcerState()
+    }
+
+    suspend fun removeFocusExceptionApp(packageName: String) {
+        dao.deleteFocusExceptionApp(packageName)
+        syncEnforcerState()
     }
 
     suspend fun updateAppDailyLimit(packageName: String, dailyLimitMinutes: Int) {

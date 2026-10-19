@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">LockIN</string>
-    <string name="accessibility_service_desc">LockIN enforces daily screen time limits on selected distraction apps and keeps you locked inside your chosen Light Novel or Reader app during Focus sessions.</string>
+    <string name="accessibility_service_desc">LockIN only checks which app package is opened in the foreground to enforce your daily screen time limits and Focus Lock sessions. LockIN never reads screen text, keystrokes, or personal data. If Android marks this toggle as a Restricted Setting, open App Info for LockIN, tap the top-right ⋮ menu, and select Allow restricted settings.</string>
     <string name="notification_channel_name">LockIN Focus &amp; Limits</string>
     <string name="notification_channel_desc">Active status of Focus Lock and daily screen time guards</string>
 </resources>

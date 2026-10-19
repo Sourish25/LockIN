@@ -68,6 +68,15 @@ class SystemAppInspector(private val context: Context) {
     fun hasAccessibilityPermission(): Boolean {
         if (AppBlockerAccessibilityService.isServiceConnected) return true
         return try {
+            val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
+            val enabledList = am?.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            if (enabledList?.any {
+                    it.resolveInfo?.serviceInfo?.packageName == context.packageName &&
+                            it.resolveInfo?.serviceInfo?.name?.contains(AppBlockerAccessibilityService::class.java.simpleName) == true
+                } == true
+            ) {
+                return true
+            }
             val enabledServices = Settings.Secure.getString(
                 context.contentResolver,
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
@@ -159,6 +168,20 @@ class SystemAppInspector(private val context: Context) {
             Intent(Settings.ACTION_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+        }
+    }
+
+    /**
+     * Opens the system App Info page for LockIN so users on Android 13-16 can tap
+     * the top-right 3-dot menu -> "Allow restricted settings" if Accessibility or
+     * Overlay toggles are greyed out after sideloading the APK.
+     */
+    fun createAppDetailsSettingsIntent(): Intent {
+        return Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.parse("package:${context.packageName}")
+        ).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
     }
 
@@ -439,9 +462,20 @@ class SystemAppInspector(private val context: Context) {
                 "librera" in lower || "fbreader" in lower || "lithium" in lower
     }
 
+    fun isEssentialUtilityApp(packageName: String, label: String): Boolean {
+        val lower = "${packageName.lowercase()} ${label.lowercase()}"
+        return "dialer" in lower || "phone" in lower || "contacts" in lower ||
+                "gpay" in lower || "google pay" in lower || "paisa" in lower ||
+                "wallet" in lower || "phonepe" in lower || "paytm" in lower ||
+                "bank" in lower || "authenticator" in lower || "messages" in lower ||
+                "mms" in lower || "calculator" in lower || "maps" in lower
+    }
+
     private fun categorizePackage(packageName: String, label: String): String {
         val lower = "${packageName.lowercase()} ${label.lowercase()}"
         return when {
+            "gpay" in lower || "google pay" in lower || "paisa" in lower || "wallet" in lower || "phonepe" in lower || "paytm" in lower || "bank" in lower -> "Payments & Banking"
+            "dialer" in lower || "phone" in lower || "contacts" in lower || "emergency" in lower || "messages" in lower || "mms" in lower || "authenticator" in lower -> "Emergency & Calls"
             "youtube" in lower || "netflix" in lower || "video" in lower || "twitch" in lower || "bilibili" in lower -> "Video"
             "instagram" in lower || "twitter" in lower || "facebook" in lower || "threads" in lower || "discord" in lower || "whatsapp" in lower || "telegram" in lower -> "Social"
             "tiktok" in lower || "musical" in lower || "reel" in lower || "shorts" in lower -> "Short Video"

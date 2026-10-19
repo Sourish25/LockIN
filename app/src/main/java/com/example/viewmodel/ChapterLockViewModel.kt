@@ -9,6 +9,7 @@ import com.example.data.AppTimerRuleEntity
 import com.example.data.ChapterLockRepository
 import com.example.data.DiscoveredDeviceApp
 import com.example.data.FocusActiveConfigEntity
+import com.example.data.FocusExceptionAppEntity
 import com.example.data.FocusHistoryRecordEntity
 import com.example.data.PinnedFocusAppEntity
 import com.example.service.AppMonitorService
@@ -108,6 +109,7 @@ data class ChapterLockUiState(
     val currentTab: AppTab = AppTab.APP_LIMITS,
     val appRules: List<AppTimerRuleEntity> = emptyList(),
     val pinnedFocusApps: List<PinnedFocusAppEntity> = emptyList(),
+    val focusExceptionApps: List<FocusExceptionAppEntity> = emptyList(),
     val focusConfig: FocusActiveConfigEntity? = null,
     val focusHistory: List<FocusHistoryRecordEntity> = emptyList(),
     val activeSession: ActiveFocusSessionState = ActiveFocusSessionState(),
@@ -115,6 +117,7 @@ data class ChapterLockUiState(
     val editingRule: AppTimerRuleEntity? = null,
     val showAddAppSheet: Boolean = false,
     val showSelectFocusAppSheet: Boolean = false,
+    val showSelectFocusExceptionsSheet: Boolean = false,
     val discoveredApps: List<DiscoveredDeviceApp> = emptyList(),
     val hasUsageStatsPermission: Boolean = false,
     val hasAccessibilityPermission: Boolean = false,
@@ -141,6 +144,7 @@ private data class InternalControlState(
     val editingRule: AppTimerRuleEntity? = null,
     val showAddAppSheet: Boolean = false,
     val showSelectFocusAppSheet: Boolean = false,
+    val showSelectFocusExceptionsSheet: Boolean = false,
     val showPermissionsSheet: Boolean = false,
     val discoveredApps: List<DiscoveredDeviceApp> = emptyList(),
     val hasUsageStatsPermission: Boolean = false,
@@ -166,12 +170,16 @@ class ChapterLockViewModel(
     )
 
     val uiState: StateFlow<ChapterLockUiState> = combine(
-        repository.appRulesFlow,
-        repository.pinnedFocusAppsFlow,
-        repository.focusConfigFlow,
+        combine(
+            repository.appRulesFlow,
+            repository.pinnedFocusAppsFlow,
+            repository.focusConfigFlow,
+            ::Triple
+        ),
         repository.focusHistoryFlow,
+        repository.focusExceptionAppsFlow,
         controlState
-    ) { rules, focusApps, focusConfig, history, ctrl ->
+    ) { (rules, focusApps, focusConfig), history, exceptionApps, ctrl ->
         val isFocusActive = focusConfig?.isStillActive() == true
         val totalSecs = (focusConfig?.selectedDurationMinutes ?: 45) * 60
         val remainingSecs = if (isFocusActive) {
@@ -199,6 +207,7 @@ class ChapterLockViewModel(
             currentTab = ctrl.currentTab,
             appRules = rules,
             pinnedFocusApps = focusApps,
+            focusExceptionApps = exceptionApps,
             focusConfig = focusConfig,
             focusHistory = history,
             activeSession = activeSession,
@@ -206,6 +215,7 @@ class ChapterLockViewModel(
             editingRule = ctrl.editingRule,
             showAddAppSheet = ctrl.showAddAppSheet,
             showSelectFocusAppSheet = ctrl.showSelectFocusAppSheet,
+            showSelectFocusExceptionsSheet = ctrl.showSelectFocusExceptionsSheet,
             discoveredApps = ctrl.discoveredApps,
             hasUsageStatsPermission = ctrl.hasUsageStatsPermission,
             hasAccessibilityPermission = ctrl.hasAccessibilityPermission,
@@ -231,26 +241,34 @@ class ChapterLockViewModel(
 
     fun refreshPermissionsAndApps() {
         viewModelScope.launch {
-            val hasUsage = repository.hasUsageStatsPermission()
-            val hasAccess = repository.hasAccessibilityPermission()
-            val hasOverlay = repository.hasOverlayPermission()
-            val hasNotif = repository.hasNotificationPermission()
-            val isIgnoringBattery = repository.isIgnoringBatteryOptimizations()
-            val isXiaomi = repository.isXiaomiDevice()
+            syncPermissionFlagsOnly()
             repository.syncSystemUsageStats()
             val discovered = repository.discoverCandidateApps()
-
             controlState.update {
-                it.copy(
-                    discoveredApps = discovered,
-                    hasUsageStatsPermission = hasUsage,
-                    hasAccessibilityPermission = hasAccess,
-                    hasOverlayPermission = hasOverlay,
-                    hasNotificationPermission = hasNotif,
-                    isIgnoringBatteryOptimizations = isIgnoringBattery,
-                    isXiaomiDevice = isXiaomi
-                )
+                it.copy(discoveredApps = discovered)
             }
+            // Re-check after 400ms in case Settings.canDrawOverlays or AppOps settles asynchronously on return
+            delay(400L)
+            syncPermissionFlagsOnly()
+        }
+    }
+
+    private fun syncPermissionFlagsOnly() {
+        val hasUsage = repository.hasUsageStatsPermission()
+        val hasAccess = repository.hasAccessibilityPermission()
+        val hasOverlay = repository.hasOverlayPermission()
+        val hasNotif = repository.hasNotificationPermission()
+        val isIgnoringBattery = repository.isIgnoringBatteryOptimizations()
+        val isXiaomi = repository.isXiaomiDevice()
+        controlState.update {
+            it.copy(
+                hasUsageStatsPermission = hasUsage,
+                hasAccessibilityPermission = hasAccess,
+                hasOverlayPermission = hasOverlay,
+                hasNotificationPermission = hasNotif,
+                isIgnoringBatteryOptimizations = isIgnoringBattery,
+                isXiaomiDevice = isXiaomi
+            )
         }
     }
 
@@ -266,6 +284,9 @@ class ChapterLockViewModel(
                     if (!config.isStillActive()) {
                         repository.endFocusLockSession(earlyQuit = false)
                     }
+                }
+                if (tick % 2L == 0L) {
+                    syncPermissionFlagsOnly()
                 }
                 if (tick % 3L == 0L) {
                     repository.syncSystemUsageStats()
@@ -297,6 +318,7 @@ class ChapterLockViewModel(
     fun buildUsageAccessSettingsIntent(): Intent = repository.createUsageAccessIntent()
     fun buildAccessibilitySettingsIntent(): Intent = repository.createAccessibilitySettingsIntent()
     fun buildOverlaySettingsIntent(): Intent = repository.createOverlaySettingsIntent()
+    fun buildAppDetailsSettingsIntent(): Intent = repository.createAppDetailsSettingsIntent()
     fun buildNotificationSettingsIntent(): Intent = repository.createNotificationSettingsIntent()
     fun buildBatteryOptimizationSettingsIntent(): Intent = repository.createBatteryOptimizationIntent()
     fun buildXiaomiAutostartIntent(): Intent? = repository.createXiaomiAutostartIntent()
@@ -382,6 +404,17 @@ class ChapterLockViewModel(
         }
     }
 
+    fun launchAllowedApp(context: Context, packageName: String) {
+        if (packageName.isNotBlank()) {
+            try {
+                repository.createLaunchIntent(packageName)?.let { launchIntent ->
+                    context.startActivity(launchIntent)
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     fun requestQuitFocusLockEarly() {
         val session = uiState.value.activeSession
         openFrictionChallenge(
@@ -394,6 +427,22 @@ class ChapterLockViewModel(
 
     fun setShowSelectFocusAppSheet(visible: Boolean) {
         controlState.update { it.copy(showSelectFocusAppSheet = visible) }
+    }
+
+    fun setShowSelectFocusExceptionsSheet(visible: Boolean) {
+        controlState.update { it.copy(showSelectFocusExceptionsSheet = visible) }
+    }
+
+    fun toggleFocusExceptionApp(packageName: String, appName: String, category: String) {
+        viewModelScope.launch {
+            repository.toggleFocusExceptionApp(packageName, appName, category)
+        }
+    }
+
+    fun removeFocusExceptionApp(packageName: String) {
+        viewModelScope.launch {
+            repository.removeFocusExceptionApp(packageName)
+        }
     }
 
     fun selectPinnedFocusApp(packageName: String) {
@@ -536,7 +585,7 @@ class ChapterLockViewModel(
                     activeChallenge = ch.copy(
                         isRevealingPattern = false,
                         currentlyFlashingTile = null,
-                        gridStatusMessage = "Tap the 5 tiles in exact order"
+                        gridStatusMessage = "Tap 5 tiles in order"
                     )
                 )
             }
@@ -575,7 +624,7 @@ class ChapterLockViewModel(
                     state.copy(
                         activeChallenge = ch.copy(
                             userClickedSequence = updatedClicked,
-                            gridStatusMessage = "Correct (${updatedClicked.size} / ${ch.patternSequence.size})"
+                            gridStatusMessage = "Tap 5 tiles in order (${updatedClicked.size}/${ch.patternSequence.size})"
                         )
                     )
                 }

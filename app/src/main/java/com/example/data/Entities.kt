@@ -81,6 +81,13 @@ data class FocusHistoryRecordEntity(
     val completedAtTimestamp: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "focus_exception_apps")
+data class FocusExceptionAppEntity(
+    @PrimaryKey val packageName: String,
+    val appName: String,
+    val category: String = "Essential"
+)
+
 fun currentEpochDay(): Long = System.currentTimeMillis() / (1000L * 60L * 60L * 24L)
 
 fun formatMinutesClean(totalMinutes: Int): String {

@@ -83,6 +83,7 @@ import com.example.ui.components.ExpressiveCloverShape
 import com.example.ui.components.ExpressiveSealShape
 import com.example.ui.components.FrictionShieldOverlay
 import com.example.ui.components.SelectFocusAppBottomSheet
+import com.example.ui.components.SelectFocusExceptionsBottomSheet
 import com.example.ui.components.SystemPermissionsBottomSheet
 import com.example.ui.screens.AppVaultScreen
 import com.example.ui.screens.ReadAndLockScreen
@@ -201,6 +202,12 @@ class MainActivity : ComponentActivity() {
                         } catch (_: Exception) {
                         }
                     },
+                    onLaunchAppDetailsSettings = {
+                        try {
+                            context.startActivity(viewModel.buildAppDetailsSettingsIntent())
+                        } catch (_: Exception) {
+                        }
+                    },
                     onLaunchNotificationSettings = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                             !uiState.hasNotificationPermission
@@ -307,6 +314,7 @@ fun ChapterLockRoot(
     onLaunchUsageSettings: () -> Unit,
     onLaunchAccessibilitySettings: () -> Unit,
     onLaunchOverlaySettings: () -> Unit,
+    onLaunchAppDetailsSettings: () -> Unit = {},
     onLaunchNotificationSettings: () -> Unit = {},
     onLaunchBatteryOptimization: () -> Unit,
     onLaunchXiaomiAutostart: () -> Unit,
@@ -322,7 +330,9 @@ fun ChapterLockRoot(
 
     Box(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val isTablet = maxWidth >= 700.dp
+            // Use side NavigationRail and 2-pane layout ONLY on wide landscape tablets;
+            // vertical/portrait tablets use full horizontal width with the bottom dock so cards never crush.
+            val isTablet = maxWidth >= 740.dp && maxWidth > maxHeight
 
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
@@ -387,6 +397,7 @@ fun ChapterLockRoot(
                                                 onOpenUsageAccessSettings = onLaunchUsageSettings,
                                                 onOpenAccessibilitySettings = onLaunchAccessibilitySettings,
                                                 onOpenOverlaySettings = onLaunchOverlaySettings,
+                                                onOpenAppDetailsSettings = onLaunchAppDetailsSettings,
                                                 onOpenPermissionsSheet = onOpenPermissionsSheet,
                                                 onTapAppRule = viewModel::onTapAppRuleCard,
                                                 onRequestUnlockApp = { rule ->
@@ -421,17 +432,24 @@ fun ChapterLockRoot(
                                             ReadAndLockScreen(
                                                 selectedFocusApp = uiState.selectedFocusApp,
                                                 activeSession = uiState.activeSession,
+                                                focusExceptionApps = uiState.focusExceptionApps,
                                                 focusHistoryCount = uiState.focusHistory.size,
                                                 isTablet = isTablet,
                                                 onSelectDuration = viewModel::selectFocusDuration,
                                                 onStartFocusLock = { viewModel.startFocusLock(context) },
                                                 onLaunchPinnedApp = onLaunchPinnedApp,
+                                                onLaunchExceptionApp = { pkg ->
+                                                    viewModel.launchAllowedApp(context, pkg)
+                                                },
                                                 onExtendFocusLock = {
                                                     viewModel.extendActiveFocusLock(context, 15)
                                                 },
                                                 onRequestQuitFocusEarly = viewModel::requestQuitFocusLockEarly,
                                                 onOpenSelectFocusAppSheet = {
                                                     viewModel.setShowSelectFocusAppSheet(true)
+                                                },
+                                                onOpenSelectFocusExceptionsSheet = {
+                                                    viewModel.setShowSelectFocusExceptionsSheet(true)
                                                 }
                                             )
                                         }
@@ -441,7 +459,7 @@ fun ChapterLockRoot(
                         }
                     }
 
-                    // Floating Pill Dock on Phone
+                    // Floating Pill Dock on Phone & Portrait Tablet
                     if (!isTablet) {
                         FloatingExpressivePillDock(
                             currentTab = uiState.currentTab,
@@ -489,6 +507,16 @@ fun ChapterLockRoot(
             onAddCustomFocusApp = viewModel::addAndSelectCustomFocusApp
         )
 
+        SelectFocusExceptionsBottomSheet(
+            isVisible = uiState.showSelectFocusExceptionsSheet,
+            exceptionApps = uiState.focusExceptionApps,
+            discoveredApps = uiState.discoveredApps,
+            pinnedFocusPackageName = uiState.selectedFocusApp?.packageName
+                ?: uiState.activeSession.pinnedPackageName,
+            onDismiss = { viewModel.setShowSelectFocusExceptionsSheet(false) },
+            onToggleExceptionApp = viewModel::toggleFocusExceptionApp
+        )
+
         SystemPermissionsBottomSheet(
             isVisible = uiState.showPermissionsSheet,
             hasUsageAccess = uiState.hasUsageStatsPermission,
@@ -501,6 +529,7 @@ fun ChapterLockRoot(
             onOpenUsageAccess = onLaunchUsageSettings,
             onOpenAccessibility = onLaunchAccessibilitySettings,
             onOpenOverlay = onLaunchOverlaySettings,
+            onOpenAppDetailsSettings = onLaunchAppDetailsSettings,
             onOpenNotifications = onLaunchNotificationSettings,
             onOpenBatteryOptimization = onLaunchBatteryOptimization,
             onOpenXiaomiAutostart = if (uiState.isXiaomiDevice) onLaunchXiaomiAutostart else null

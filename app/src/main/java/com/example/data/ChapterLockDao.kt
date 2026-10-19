@@ -66,4 +66,20 @@ interface ChapterLockDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun recordFocusHistory(record: FocusHistoryRecordEntity)
+
+    // --- Focus Lock Allowed Exception Apps (Emergency Calls, GPay, Utilities) ---
+    @Query("SELECT * FROM focus_exception_apps ORDER BY appName ASC")
+    fun observeFocusExceptionApps(): Flow<List<FocusExceptionAppEntity>>
+
+    @Query("SELECT * FROM focus_exception_apps ORDER BY appName ASC")
+    suspend fun getFocusExceptionAppsOnce(): List<FocusExceptionAppEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertFocusExceptionApp(app: FocusExceptionAppEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertFocusExceptionApps(apps: List<FocusExceptionAppEntity>)
+
+    @Query("DELETE FROM focus_exception_apps WHERE packageName = :packageName")
+    suspend fun deleteFocusExceptionApp(packageName: String)
 }

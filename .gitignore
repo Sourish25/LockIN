@@ -18,3 +18,7 @@ local.properties
 debug.keystore
 .build-outputs/
 .aistudio/
+/releases/
+/release-assets/
+*.jks
+

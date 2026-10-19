@@ -46,16 +46,16 @@ LockIN includes a responsive two-pane canonical layout with a persistent navigat
 * **Reboot and Update Survivability (`BootReceiver`)**: Listens for `ACTION_BOOT_COMPLETED`, `QUICKBOOT_POWERON`, and `ACTION_MY_PACKAGE_REPLACED` to restore active timers and background guards automatically after a device restart.
 * **No Preset or Mock Data**: Fresh installations start with an empty database and inspect only real launchable packages installed on the user's device via `PackageManager`.
 
-## Releases and ABI Architecture Downloads
+## Native GitHub Releases and ABI Architecture Downloads
 
-Release builds are split by CPU ABI so you can install the smallest native binary for your device. Prebuilt release APKs and `SHA256SUMS.txt` verification hashes are available in `releases/v1.0.0/` as well as on the GitHub Releases page:
+Release builds are split by CPU ABI and published directly to **GitHub Releases** via `.github/workflows/release.yml` (never committed into a repository folder):
 
-* [`LockIN-v1.0.0-arm64-v8a.apk`](releases/v1.0.0/LockIN-v1.0.0-arm64-v8a.apk): Recommended for 64-bit ARM Android phones and tablets (ARMv8-A).
-* [`LockIN-v1.0.0-armeabi-v7a.apk`](releases/v1.0.0/LockIN-v1.0.0-armeabi-v7a.apk): For 32-bit ARM Android devices (ARMv7-A).
-* [`LockIN-v1.0.0-x86_64.apk`](releases/v1.0.0/LockIN-v1.0.0-x86_64.apk): For 64-bit x86 tablets, Chromebooks, and Android emulators.
-* [`LockIN-v1.0.0-x86.apk`](releases/v1.0.0/LockIN-v1.0.0-x86.apk): For 32-bit x86 devices and legacy emulators.
-* [`LockIN-v1.0.0-universal.apk`](releases/v1.0.0/LockIN-v1.0.0-universal.apk): Universal package containing all CPU architectures (`arm64-v8a`, `armeabi-v7a`, `x86`, and `x86_64`).
-* [`SHA256SUMS.txt`](releases/v1.0.0/SHA256SUMS.txt): SHA-256 checksums for all release APKs.
+* `LockIN-v1.1.0-arm64-v8a.apk`: Recommended for 64-bit ARM Android phones and tablets (ARMv8-A).
+* `LockIN-v1.1.0-armeabi-v7a.apk`: For 32-bit ARM Android devices (ARMv7-A).
+* `LockIN-v1.1.0-x86_64.apk`: For 64-bit x86 tablets, Chromebooks, and Android emulators.
+* `LockIN-v1.1.0-x86.apk`: For 32-bit x86 devices and legacy emulators.
+* `LockIN-v1.1.0-universal.apk`: Universal package containing all CPU architectures (`arm64-v8a`, `armeabi-v7a`, `x86`, and `x86_64`).
+* `SHA256SUMS.txt`: SHA-256 verification checksums attached to each GitHub Release.
 
 ## Required Android Permissions
 

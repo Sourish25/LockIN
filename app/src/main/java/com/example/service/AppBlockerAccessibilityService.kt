@@ -91,6 +91,17 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             }
         }
 
+        // 2b. Continuously observe Focus Lock exception apps (Emergency Calls, GPay, etc.)
+        serviceScope.launch {
+            try {
+                db.dao().observeFocusExceptionApps().collect { exceptions ->
+                    ChapterLockEnforcer.syncFocusExceptions(exceptions.map { it.packageName })
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to observe focus exception apps in accessibility service", e)
+            }
+        }
+
         // 3. Continuous 500ms active window & live usage enforcement loop
         // Ensures that even if YouTube is already open when its daily timer expires,
         // or if an app switch skips TYPE_WINDOW_STATE_CHANGED, it is blocked within 0.5s.
@@ -106,14 +117,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                             repo.getAllAppRulesOnce()
                         )
                     }
-                    val activeWindowPkg = try {
-                        rootInActiveWindow?.packageName?.toString()
-                    } catch (_: Exception) {
-                        null
-                    }
-                    val fgPkg = activeWindowPkg?.takeIf { it.isNotBlank() }
-                        ?: inspector.queryCurrentForegroundPackage()
-
+                    val fgPkg = inspector.queryCurrentForegroundPackage()
                     if (!fgPkg.isNullOrBlank()) {
                         inspectAndEnforcePackage(fgPkg)
                     }
@@ -129,19 +133,13 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         if (event == null) return
         val type = event.eventType
         if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            type != AccessibilityEvent.TYPE_WINDOWS_CHANGED &&
-            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+            type != AccessibilityEvent.TYPE_WINDOWS_CHANGED
         ) {
             return
         }
 
-        val eventPkg = event.packageName?.toString()
-        val rootPkg = try {
-            rootInActiveWindow?.packageName?.toString()
-        } catch (_: Exception) {
-            null
-        }
-        val candidatePkg = eventPkg?.takeIf { it.isNotBlank() } ?: rootPkg ?: return
+        val candidatePkg = event.packageName?.toString()?.takeIf { it.isNotBlank() }
+            ?: return
         inspectAndEnforcePackage(candidatePkg)
     }
 
