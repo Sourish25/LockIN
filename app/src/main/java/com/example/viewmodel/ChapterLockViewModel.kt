@@ -15,12 +15,16 @@ import com.example.data.PinnedFocusAppEntity
 import com.example.service.AppMonitorService
 import com.example.service.LockNotificationManager
 import com.example.service.LockWindowOverlayManager
+import com.example.updater.AppReleaseInfo
+import com.example.updater.UpdateState
+import java.io.File
 import kotlin.random.Random
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -231,12 +235,38 @@ class ChapterLockViewModel(
         initialValue = ChapterLockUiState()
     )
 
+    val updateState: StateFlow<UpdateState> = repository.updateManager.updateState
+
     init {
         viewModelScope.launch {
             repository.ensureSeededAndSynced()
             refreshPermissionsAndApps()
             startPeriodicTicker()
         }
+    }
+
+    fun checkForUpdates() {
+        viewModelScope.launch {
+            repository.updateManager.checkForUpdates()
+        }
+    }
+
+    fun startUpdateDownload(release: AppReleaseInfo) {
+        viewModelScope.launch {
+            repository.updateManager.startDownload(release)
+        }
+    }
+
+    fun installUpdateApk(apkFile: File, release: AppReleaseInfo) {
+        repository.updateManager.promptInstall(apkFile, release)
+    }
+
+    fun dismissUpdateSheet() {
+        repository.updateManager.dismiss()
+    }
+
+    fun buildUnknownAppSourcesSettingsIntent(): Intent {
+        return repository.updateManager.buildUnknownAppSourcesSettingsIntent()
     }
 
     fun refreshPermissionsAndApps() {

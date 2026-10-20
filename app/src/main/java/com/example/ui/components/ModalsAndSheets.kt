@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SystemUpdate
+import com.example.BuildConfig
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -1113,7 +1115,8 @@ fun SystemPermissionsBottomSheet(
     onOpenAppDetailsSettings: (() -> Unit)? = null,
     onOpenNotifications: (() -> Unit)? = null,
     onOpenBatteryOptimization: () -> Unit,
-    onOpenXiaomiAutostart: (() -> Unit)?
+    onOpenXiaomiAutostart: (() -> Unit)?,
+    onCheckForUpdates: (() -> Unit)? = null
 ) {
     if (!isVisible) return
 
@@ -1209,6 +1212,51 @@ fun SystemPermissionsBottomSheet(
                     onGrantClick = onOpenXiaomiAutostart,
                     buttonLabel = "Configure"
                 )
+            }
+
+            if (onCheckForUpdates != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shape = RoundedCornerShape(22.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "LockIN v${BuildConfig.VERSION_NAME}",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "GitHub Releases channel",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                onDismiss()
+                                onCheckForUpdates()
+                            },
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.SystemUpdate,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Updates", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
             }
 
             Button(

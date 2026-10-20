@@ -77,10 +77,13 @@ import com.example.service.AppMonitorService
 import com.example.service.ChapterLockEnforcer
 import com.example.service.LockNotificationManager
 import com.example.service.LockWindowOverlayManager
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.runtime.rememberCoroutineScope
 import com.example.ui.components.AddAppTimerBottomSheet
 import com.example.ui.components.EditAppLimitBottomSheet
 import com.example.ui.components.ExpressiveCloverShape
 import com.example.ui.components.ExpressiveSealShape
+import com.example.ui.components.ExpressiveUpdateModalSheet
 import com.example.ui.components.FrictionShieldOverlay
 import com.example.ui.components.SelectFocusAppBottomSheet
 import com.example.ui.components.SelectFocusExceptionsBottomSheet
@@ -91,10 +94,13 @@ import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LockInMotion
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.expressiveClickable
+import com.example.updater.AppUpdateManager
+import com.example.updater.UpdateState
 import com.example.viewmodel.AppTab
 import com.example.viewmodel.ChapterLockUiState
 import com.example.viewmodel.ChapterLockViewModel
 import com.example.viewmodel.FrictionReason
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -321,6 +327,7 @@ fun ChapterLockRoot(
     onLaunchPinnedApp: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
 
     if (uiState.currentTab != AppTab.APP_LIMITS && uiState.activeChallenge == null) {
         BackHandler {
@@ -361,9 +368,11 @@ fun ChapterLockRoot(
                             ExpressiveTopBar(
                                 currentTab = uiState.currentTab,
                                 allPermissionsGranted = uiState.allCorePermissionsGranted,
+                                isUpdateAvailable = updateState is UpdateState.UpdateAvailable,
                                 useDynamicWallpaper = useDynamicWallpaper,
                                 isTablet = isTablet,
                                 onOpenPermissionsSheet = onOpenPermissionsSheet,
+                                onCheckForUpdates = viewModel::checkForUpdates,
                                 onToggleWallpaperTheme = onToggleWallpaperTheme
                             )
 
@@ -532,7 +541,22 @@ fun ChapterLockRoot(
             onOpenAppDetailsSettings = onLaunchAppDetailsSettings,
             onOpenNotifications = onLaunchNotificationSettings,
             onOpenBatteryOptimization = onLaunchBatteryOptimization,
-            onOpenXiaomiAutostart = if (uiState.isXiaomiDevice) onLaunchXiaomiAutostart else null
+            onOpenXiaomiAutostart = if (uiState.isXiaomiDevice) onLaunchXiaomiAutostart else null,
+            onCheckForUpdates = viewModel::checkForUpdates
+        )
+
+        ExpressiveUpdateModalSheet(
+            updateState = updateState,
+            onDismiss = viewModel::dismissUpdateSheet,
+            onDownloadClick = viewModel::startUpdateDownload,
+            onInstallClick = viewModel::installUpdateApk,
+            onOpenUnknownSourcesSettings = {
+                try {
+                    context.startActivity(viewModel.buildUnknownAppSourcesSettingsIntent())
+                } catch (_: Exception) {
+                }
+            },
+            onRetryCheck = viewModel::checkForUpdates
         )
 
         // Full-Screen Hard Puzzle Gate
@@ -556,9 +580,11 @@ fun ChapterLockRoot(
 internal fun ExpressiveTopBar(
     currentTab: AppTab,
     allPermissionsGranted: Boolean = true,
+    isUpdateAvailable: Boolean = false,
     useDynamicWallpaper: Boolean,
     isTablet: Boolean,
     onOpenPermissionsSheet: () -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
     onToggleWallpaperTheme: () -> Unit
 ) {
     Row(
@@ -595,6 +621,27 @@ internal fun ExpressiveTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isUpdateAvailable) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceContainerHigh
+                    )
+                    .expressiveClickable { onCheckForUpdates() }
+                    .testTag("check_updates_button"),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.SystemUpdate,
+                    contentDescription = "Check for Updates",
+                    tint = if (isUpdateAvailable) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .size(48.dp)

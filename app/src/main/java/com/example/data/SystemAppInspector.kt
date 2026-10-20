@@ -24,7 +24,7 @@ data class DiscoveredDeviceApp(
     val usedMinutesToday: Int = 0
 )
 
-class SystemAppInspector(private val context: Context) {
+class SystemAppInspector(val context: Context) {
 
     // Core OS packages that must never be blocked to prevent locking the user out of the home launcher or system UI
     private val nonBlockableSystemPackages = setOf(

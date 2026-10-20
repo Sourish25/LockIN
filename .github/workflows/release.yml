@@ -35,9 +35,16 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x ./gradlew
+
       - name: Prepare Release Signing Keystore
         run: |
-          if [ ! -f my-upload-key.jks ]; then
+          if [ -f release.keystore.base64 ]; then
+            echo "Restoring release signing keystore from repository secret base64"
+            base64 -d release.keystore.base64 > my-upload-key.jks
+          elif [ ! -f my-upload-key.jks ]; then
+            echo "Generating fallback keystore"
             keytool -genkeypair -v \
               -keystore my-upload-key.jks \
               -alias upload \

@@ -3,12 +3,16 @@ package com.example.data
 import android.content.Intent
 import com.example.service.ChapterLockEnforcer
 import com.example.service.LockWindowOverlayManager
+import com.example.updater.AppUpdateManager
 import kotlinx.coroutines.flow.Flow
 
 class ChapterLockRepository(
     private val dao: ChapterLockDao,
-    private val systemInspector: SystemAppInspector
+    val systemInspector: SystemAppInspector
 ) {
+    val updateManager: AppUpdateManager by lazy {
+        AppUpdateManager(systemInspector.context.applicationContext)
+    }
     val appRulesFlow: Flow<List<AppTimerRuleEntity>> = dao.observeAppRules()
     val pinnedFocusAppsFlow: Flow<List<PinnedFocusAppEntity>> = dao.observePinnedFocusApps()
     val focusConfigFlow: Flow<FocusActiveConfigEntity?> = dao.observeFocusConfig()
