@@ -19,7 +19,6 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.example.MainActivity
-import com.example.ui.components.ExpressiveCrossRainOverlayView
 import com.example.ui.theme.ExpressiveFeedbackEngine
 
 /**
@@ -153,16 +152,6 @@ object LockWindowOverlayManager {
             isClickable = true
             isFocusable = true
         }
-
-        // 60fps Material 3 Expressive Red Cross Rain backdrop
-        val crossRainView = ExpressiveCrossRainOverlayView(context)
-        root.addView(
-            crossRainView,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-        )
 
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL

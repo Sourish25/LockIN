@@ -45,10 +45,31 @@ class AppMonitorService : Service() {
                 Log.e(TAG, "Failed to start AppMonitorService", e)
             }
         }
+
+        fun stop(context: Context) {
+            try {
+                val intent = Intent(context, AppMonitorService::class.java)
+                context.stopService(intent)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var monitorJob: Job? = null
+
+    private fun stopForegroundAndSelf() {
+        try {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        } catch (_: Exception) {
+        }
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+            nm?.cancel(NOTIFICATION_ID)
+        } catch (_: Exception) {
+        }
+        stopSelf()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -84,7 +105,7 @@ class AppMonitorService : Service() {
         } else {
             LockNotificationManager.refreshForegroundNotification(this)
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -103,7 +124,6 @@ class AppMonitorService : Service() {
                 ChapterLockEnforcer.registerAppLabels(
                     discovered.associate { it.packageName to it.appName }
                 )
-                LockNotificationManager.refreshForegroundNotification(applicationContext)
             } catch (_: Exception) {
             }
 
@@ -118,7 +138,7 @@ class AppMonitorService : Service() {
                         LockNotificationManager.checkAndNotifyLimitMilestones(applicationContext, currentRules)
                     }
 
-                    // 2. Check if an active Focus Lock session naturally completed in the background
+                    // 2. Check if an active Focus Lock session naturally completed or is inactive
                     val focusConfig = dao.getFocusConfigOnce()
                     if (focusConfig != null && focusConfig.isActive && !focusConfig.isStillActive()) {
                         val completedName = focusConfig.pinnedAppName.ifBlank { "Focus App" }
@@ -131,6 +151,12 @@ class AppMonitorService : Service() {
                             completedPackageName = completedPkg,
                             durationMinutes = completedDuration
                         )
+                        stopForegroundAndSelf()
+                        break
+                    } else if (focusConfig == null || !focusConfig.isStillActive()) {
+                        // Focus Lock is not running: dismiss foreground notification and stop service
+                        stopForegroundAndSelf()
+                        break
                     } else if (loopCount % 5L == 0L) {
                         LockNotificationManager.refreshForegroundNotification(applicationContext)
                     }

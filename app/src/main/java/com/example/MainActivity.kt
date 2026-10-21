@@ -120,8 +120,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Ensure the background guardian service is running
-        AppMonitorService.start(applicationContext)
+        // Refresh foreground notification state (active only when Focus Lock countdown is running)
+        LockNotificationManager.refreshForegroundNotification(applicationContext)
 
         setContent {
             val context = LocalContext.current

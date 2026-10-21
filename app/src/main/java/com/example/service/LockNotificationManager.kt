@@ -235,14 +235,22 @@ object LockNotificationManager {
     }
 
     /**
-     * Immediately updates the ongoing foreground service notification to reflect the latest
-     * Focus Lock timer or daily app limit counters.
+     * Immediately updates the ongoing foreground service notification when Focus Lock is active,
+     * or dismisses the ongoing notification when Focus Lock is idle (since AccessibilityService
+     * monitors daily limits silently in the background).
      */
     fun refreshForegroundNotification(context: Context) {
         try {
             ensureChannels(context)
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-            nm.notify(NOTIFICATION_ID_FOREGROUND, buildForegroundServiceNotification(context))
+            val focusActive = ChapterLockEnforcer.isFocusModeCurrentlyActive() &&
+                ChapterLockEnforcer.getFocusEndTimeEpochMillis() > System.currentTimeMillis()
+            if (focusActive) {
+                nm.notify(NOTIFICATION_ID_FOREGROUND, buildForegroundServiceNotification(context))
+            } else {
+                nm.cancel(NOTIFICATION_ID_FOREGROUND)
+                AppMonitorService.stop(context)
+            }
         } catch (_: Exception) {
         }
     }

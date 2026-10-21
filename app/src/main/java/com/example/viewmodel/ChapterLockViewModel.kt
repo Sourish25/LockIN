@@ -280,6 +280,7 @@ class ChapterLockViewModel(
             // Re-check after 400ms in case Settings.canDrawOverlays or AppOps settles asynchronously on return
             delay(400L)
             syncPermissionFlagsOnly()
+            repository.updateManager.onAppResumed()
         }
     }
 

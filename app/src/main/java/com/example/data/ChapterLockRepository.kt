@@ -171,13 +171,20 @@ class ChapterLockRepository(
         ChapterLockEnforcer.syncRules(rules)
         ChapterLockEnforcer.syncFocusExceptions(exceptions.map { it.packageName })
         if (config != null) {
+            val active = config.isStillActive()
             ChapterLockEnforcer.updateFocusLockState(
-                active = config.isStillActive(),
+                active = active,
                 pinnedPackage = config.pinnedPackageName.takeIf { it.isNotBlank() },
                 pinnedName = config.pinnedAppName,
                 endTimeMs = config.endTimeEpochMs
             )
+            if (active) {
+                com.example.service.AppMonitorService.start(systemInspector.context.applicationContext)
+            }
         }
+        com.example.service.LockNotificationManager.refreshForegroundNotification(
+            systemInspector.context.applicationContext
+        )
     }
 
     suspend fun toggleFocusExceptionApp(

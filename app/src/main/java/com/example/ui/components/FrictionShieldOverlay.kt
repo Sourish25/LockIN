@@ -136,11 +136,6 @@ fun FrictionShieldOverlay(
                 .imePadding(),
             contentAlignment = Alignment.Center
         ) {
-            // Material 3 Expressive Red Cross Rain backdrop
-            ExpressiveRedCrossRain(
-                modifier = Modifier.fillMaxSize()
-            )
-
             val isTablet = maxWidth >= 740.dp && maxWidth > maxHeight
 
             if (isTablet) {

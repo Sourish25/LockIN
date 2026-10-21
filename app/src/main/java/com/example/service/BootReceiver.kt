@@ -4,10 +4,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.example.data.ChapterLockDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
- * Restores LockIN background guarding, daily app limit enforcement,
- * and active reading focus sessions after device reboot or app update.
+ * Restores active Focus Lock countdown notifications after device reboot or app update.
+ * When Focus Lock is idle, daily app limits are monitored silently via AccessibilityService
+ * without showing any persistent foreground notification.
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -18,11 +23,29 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            Log.i(TAG, "Device rebooted or package replaced ($action). Restoring LockIN guard.")
-            try {
-                AppMonitorService.start(context)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to start AppMonitorService on boot", e)
+            Log.i(TAG, "Device rebooted or package replaced ($action). Checking active Focus Lock state.")
+            val pendingResult = goAsync()
+            val appContext = context.applicationContext
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val dao = ChapterLockDatabase.getInstance(appContext).dao()
+                    val focusConfig = dao.getFocusConfigOnce()
+                    if (focusConfig != null && focusConfig.isStillActive()) {
+                        ChapterLockEnforcer.updateFocusLockState(
+                            active = true,
+                            pinnedPackage = focusConfig.pinnedPackageName,
+                            pinnedName = focusConfig.pinnedAppName,
+                            endTimeMs = focusConfig.endTimeEpochMs
+                        )
+                        AppMonitorService.start(appContext)
+                    } else {
+                        LockNotificationManager.refreshForegroundNotification(appContext)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to check Focus Lock state on boot", e)
+                } finally {
+                    pendingResult.finish()
+                }
             }
         }
     }

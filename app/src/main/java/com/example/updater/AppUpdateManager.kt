@@ -293,13 +293,25 @@ class AppUpdateManager(private val context: Context) {
 
                 _updateState.value = UpdateState.Verifying(release)
 
-                // Verify file size and readiness
-                if (targetFile.length() < 1000) {
+                // Guard 1: Verify minimum file size and ZIP/APK magic header (PK\x03\x04)
+                if (targetFile.length() < 4096 || !isValidApkArchive(targetFile)) {
                     targetFile.delete()
                     throw IllegalStateException("Downloaded APK file is incomplete or corrupted")
                 }
 
-                _updateState.value = UpdateState.ReadyToInstall(release, targetFile)
+                // Guard 2: Verify SHA-256 checksum if provided
+                val computedSha = calculateSha256(targetFile)
+                if (!release.sha256Checksum.isNullOrBlank() &&
+                    !computedSha.equals(release.sha256Checksum.trim(), ignoreCase = true)
+                ) {
+                    targetFile.delete()
+                    throw IllegalStateException("SHA-256 checksum mismatch for downloaded APK")
+                }
+
+                _updateState.value = UpdateState.ReadyToInstall(
+                    release.copy(sha256Checksum = computedSha),
+                    targetFile
+                )
             } catch (e: Exception) {
                 if (targetFile.exists()) targetFile.delete()
                 _updateState.value = UpdateState.Error("Download failed: ${e.message}")
@@ -307,9 +319,24 @@ class AppUpdateManager(private val context: Context) {
         }
     }
 
+    fun isValidApkArchive(file: File): Boolean {
+        if (!file.exists() || file.length() < 4) return false
+        return try {
+            val header = ByteArray(4)
+            file.inputStream().use { it.read(header) }
+            // Standard APK / ZIP magic number: 0x50 ('P'), 0x4B ('K'), 0x03, 0x04
+            header[0] == 0x50.toByte() &&
+                header[1] == 0x4B.toByte() &&
+                header[2] == 0x03.toByte() &&
+                header[3] == 0x04.toByte()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun promptInstall(apkFile: File, release: AppReleaseInfo) {
-        if (!apkFile.exists()) {
-            _updateState.value = UpdateState.Error("APK file missing, please download again")
+        if (!apkFile.exists() || !isValidApkArchive(apkFile)) {
+            _updateState.value = UpdateState.Error("APK file missing or corrupted, please download again")
             return
         }
 
@@ -324,8 +351,23 @@ class AppUpdateManager(private val context: Context) {
         executeInstallIntent(apkFile)
     }
 
+    fun onAppResumed() {
+        val current = _updateState.value
+        if (current is UpdateState.PermissionRequired) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+                context.packageManager.canRequestPackageInstalls()
+            ) {
+                _updateState.value = UpdateState.ReadyToInstall(current.release, current.apkFile)
+                executeInstallIntent(current.apkFile)
+            }
+        }
+    }
+
     fun executeInstallIntent(apkFile: File) {
         try {
+            com.example.service.ChapterLockEnforcer.allowSystemSettingsTemporarily()
+            com.example.service.LockWindowOverlayManager.dismiss()
+
             val contentUri: Uri = FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
@@ -343,6 +385,8 @@ class AppUpdateManager(private val context: Context) {
     }
 
     fun buildUnknownAppSourcesSettingsIntent(): Intent {
+        com.example.service.ChapterLockEnforcer.allowSystemSettingsTemporarily()
+        com.example.service.LockWindowOverlayManager.dismiss()
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Intent(
                 Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,

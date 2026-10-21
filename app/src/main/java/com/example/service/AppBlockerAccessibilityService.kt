@@ -49,7 +49,6 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         Log.i(TAG, "LockIN Accessibility Service connected.")
 
         createNotificationChannel()
-        AppMonitorService.start(applicationContext)
 
         val db = ChapterLockDatabase.getInstance(applicationContext)
         val inspector = SystemAppInspector(applicationContext)
@@ -77,12 +76,18 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             try {
                 db.dao().observeFocusConfig().collect { config ->
                     if (config != null) {
+                        val active = config.isStillActive()
                         ChapterLockEnforcer.updateFocusLockState(
-                            active = config.isStillActive(),
+                            active = active,
                             pinnedPackage = config.pinnedPackageName,
                             pinnedName = config.pinnedAppName,
                             endTimeMs = config.endTimeEpochMs
                         )
+                        if (active) {
+                            AppMonitorService.start(applicationContext)
+                        }
+                        LockNotificationManager.refreshForegroundNotification(applicationContext)
+                    } else {
                         LockNotificationManager.refreshForegroundNotification(applicationContext)
                     }
                 }
