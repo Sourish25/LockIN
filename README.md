@@ -50,11 +50,11 @@ LockIN includes a responsive two-pane canonical layout with a persistent navigat
 
 Release builds are split by CPU ABI and published directly to **GitHub Releases** via `.github/workflows/release.yml` (never committed into a repository folder):
 
-* `LockIN-v1.1.0-arm64-v8a.apk`: Recommended for 64-bit ARM Android phones and tablets (ARMv8-A).
-* `LockIN-v1.1.0-armeabi-v7a.apk`: For 32-bit ARM Android devices (ARMv7-A).
-* `LockIN-v1.1.0-x86_64.apk`: For 64-bit x86 tablets, Chromebooks, and Android emulators.
-* `LockIN-v1.1.0-x86.apk`: For 32-bit x86 devices and legacy emulators.
-* `LockIN-v1.1.0-universal.apk`: Universal package containing all CPU architectures (`arm64-v8a`, `armeabi-v7a`, `x86`, and `x86_64`).
+* `LockIN-v1.2.0-arm64-v8a.apk`: Recommended for 64-bit ARM Android phones and tablets (ARMv8-A).
+* `LockIN-v1.2.0-armeabi-v7a.apk`: For 32-bit ARM Android devices (ARMv7-A).
+* `LockIN-v1.2.0-x86_64.apk`: For 64-bit x86 tablets, Chromebooks, and Android emulators.
+* `LockIN-v1.2.0-x86.apk`: For 32-bit x86 devices and legacy emulators.
+* `LockIN-v1.2.0-universal.apk`: Universal package containing all CPU architectures (`arm64-v8a`, `armeabi-v7a`, `x86`, and `x86_64`).
 * `SHA256SUMS.txt`: SHA-256 verification checksums attached to each GitHub Release.
 
 ## Required Android Permissions

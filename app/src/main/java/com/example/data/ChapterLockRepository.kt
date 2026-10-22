@@ -5,11 +5,14 @@ import com.example.service.ChapterLockEnforcer
 import com.example.service.LockWindowOverlayManager
 import com.example.updater.AppUpdateManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class ChapterLockRepository(
     private val dao: ChapterLockDao,
     val systemInspector: SystemAppInspector
 ) {
+    private val syncMutex = Mutex()
     val updateManager: AppUpdateManager by lazy {
         AppUpdateManager(systemInspector.context.applicationContext)
     }
@@ -83,7 +86,7 @@ class ChapterLockRepository(
      * Synchronizes midnight daily counter resets, real installed reader apps,
      * and real UsageStats without seeding any fake or demo app limits.
      */
-    suspend fun ensureSeededAndSynced() {
+    suspend fun ensureSeededAndSynced() = syncMutex.withLock {
         val todayEpoch = currentEpochDay()
         val existingRules = dao.getAllAppRulesOnce()
 

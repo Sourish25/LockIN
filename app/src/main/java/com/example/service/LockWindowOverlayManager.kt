@@ -74,7 +74,23 @@ object LockWindowOverlayManager {
                         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                     isFromAccessibilityService && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1 ->
                         WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-                    !canDrawAppOverlay -> return@post
+                    !canDrawAppOverlay -> {
+                        val fallbackIntent = Intent(context, com.example.MainActivity::class.java).apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or
+                                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            )
+                            putExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE, decision.packageName)
+                            putExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON, decision.reason.name)
+                        }
+                        try {
+                            context.startActivity(fallbackIntent)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to launch fallback activity", e)
+                        }
+                        return@post
+                    }
                     else -> {
                         @Suppress("DEPRECATION")
                         WindowManager.LayoutParams.TYPE_PHONE

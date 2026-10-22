@@ -56,15 +56,21 @@ class AppUpdateManager(private val context: Context) {
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
 
     companion object {
-        const val DEFAULT_REPO = "joymaity25/lockin"
+        const val DEFAULT_REPO = "Sourish25/LockIN"
         const val GITHUB_API_URL = "https://api.github.com/repos"
 
         fun isNewerVersion(currentVersion: String, remoteVersion: String): Boolean {
-            val currClean = currentVersion.trimStart('v').split("-")[0]
-            val remClean = remoteVersion.trimStart('v').split("-")[0]
+            val currClean = currentVersion.trimStart('v').trim()
+            val remClean = remoteVersion.trimStart('v').trim()
 
-            val currParts = currClean.split(".").mapNotNull { it.toIntOrNull() }
-            val remParts = remClean.split(".").mapNotNull { it.toIntOrNull() }
+            val currPre = currClean.contains("-")
+            val remPre = remClean.contains("-")
+
+            val currBase = currClean.split("-")[0]
+            val remBase = remClean.split("-")[0]
+
+            val currParts = currBase.split(".").mapNotNull { it.toIntOrNull() }
+            val remParts = remBase.split(".").mapNotNull { it.toIntOrNull() }
 
             val maxLen = maxOf(currParts.size, remParts.size)
             for (i in 0 until maxLen) {
@@ -73,6 +79,13 @@ class AppUpdateManager(private val context: Context) {
                 if (r > c) return true
                 if (r < c) return false
             }
+
+            // If base numeric parts are equal:
+            // e.g. current is pre-release "1.1.0-beta" and remote is stable "1.1.0" -> remote is newer!
+            if (currPre && !remPre) return true
+            // If current is stable "1.1.0" and remote is pre-release "1.1.0-beta" -> remote is not newer
+            if (!currPre && remPre) return false
+
             return false
         }
 
@@ -138,6 +151,17 @@ class AppUpdateManager(private val context: Context) {
                 }
 
                 val responseCode = connection.responseCode
+                if (responseCode == 403 || responseCode == 429) {
+                    val remaining = connection.getHeaderField("X-RateLimit-Remaining")
+                    val msg = if (remaining == "0") {
+                        "GitHub API rate limit reached. Please try again later."
+                    } else {
+                        "GitHub API request limit reached ($responseCode). Please try again later."
+                    }
+                    _updateState.value = UpdateState.Error(msg)
+                    return@withContext
+                }
+
                 if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
                     // Try fetching all releases if latest is not tagged as latest
                     fetchFirstAvailableRelease(repo)
@@ -168,6 +192,10 @@ class AppUpdateManager(private val context: Context) {
                 readTimeout = 8000
                 setRequestProperty("Accept", "application/vnd.github.v3+json")
                 setRequestProperty("User-Agent", "LockIN-Updater/${BuildConfig.VERSION_NAME}")
+            }
+            if (connection.responseCode == 403 || connection.responseCode == 429) {
+                _updateState.value = UpdateState.Error("GitHub API rate limit reached. Please try again later.")
+                return
             }
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
@@ -251,7 +279,9 @@ class AppUpdateManager(private val context: Context) {
                     }
                     val code = connection.responseCode
                     if (code in listOf(HttpURLConnection.HTTP_MOVED_PERM, HttpURLConnection.HTTP_MOVED_TEMP, 307, 308)) {
-                        currentUrl = connection.getHeaderField("Location")
+                        val location = connection.getHeaderField("Location")
+                            ?: throw IllegalStateException("Redirect missing Location header")
+                        currentUrl = URL(url, location).toString()
                         redirects++
                     } else if (code == HttpURLConnection.HTTP_OK) {
                         break

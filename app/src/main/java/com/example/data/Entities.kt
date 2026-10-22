@@ -88,7 +88,11 @@ data class FocusExceptionAppEntity(
     val category: String = "Essential"
 )
 
-fun currentEpochDay(): Long = System.currentTimeMillis() / (1000L * 60L * 60L * 24L)
+fun currentEpochDay(): Long {
+    val cal = java.util.Calendar.getInstance()
+    val localMillis = cal.timeInMillis + cal.timeZone.getOffset(cal.timeInMillis)
+    return localMillis / (1000L * 60L * 60L * 24L)
+}
 
 fun formatMinutesClean(totalMinutes: Int): String {
     if (totalMinutes <= 0) return "0m"

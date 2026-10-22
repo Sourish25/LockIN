@@ -719,6 +719,17 @@ class ChapterLockViewModel(
         val challenge = controlState.value.activeChallenge ?: return
         val problem = challenge.currentMathProblem
         val parsed = challenge.mathInput.toIntOrNull()
+        if (parsed == null) {
+            controlState.update { state ->
+                val current = state.activeChallenge ?: return@update state
+                state.copy(
+                    activeChallenge = current.copy(
+                        mathErrorMessage = "Please enter a valid number."
+                    )
+                )
+            }
+            return
+        }
         if (parsed != problem.expectedAnswer) {
             val freshChain = generateHardMathChain()
             controlState.update { state ->
@@ -834,6 +845,12 @@ class ChapterLockViewModel(
             MathStepProblem(2, 3, "($a2 − $b2) × $c2", ans2),
             MathStepProblem(3, 3, "($a3 × $b3) − $c3", ans3)
         )
+    }
+
+    override fun onCleared() {
+        timerJob?.cancel()
+        patternRevealJob?.cancel()
+        super.onCleared()
     }
 
     companion object {

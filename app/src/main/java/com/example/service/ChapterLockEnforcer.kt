@@ -114,17 +114,16 @@ object ChapterLockEnforcer {
     }
 
     fun syncRules(rules: List<AppTimerRuleEntity>) {
-        appRulesMap.clear()
         val now = System.currentTimeMillis()
+        val newMap = rules.associateBy { it.packageName }
         for (rule in rules) {
-            appRulesMap[rule.packageName] = rule
             knownAppLabels[rule.packageName] = rule.appName
             if (rule.unlockedUntilEpochMs > now) {
                 temporaryUnlocks[rule.packageName] = rule.unlockedUntilEpochMs
-            } else {
-                temporaryUnlocks.remove(rule.packageName)
             }
         }
+        appRulesMap.keys.retainAll(newMap.keys)
+        appRulesMap.putAll(newMap)
     }
 
     fun grantTemporaryUnlock(packageName: String, durationMinutes: Int) {

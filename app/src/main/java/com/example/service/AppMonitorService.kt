@@ -78,12 +78,19 @@ class AppMonitorService : Service() {
         val initialNotification = LockNotificationManager.buildForegroundServiceNotification(this)
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 ServiceCompat.startForeground(
                     this,
                     NOTIFICATION_ID,
                     initialNotification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    initialNotification,
+                    0
                 )
             } else {
                 startForeground(NOTIFICATION_ID, initialNotification)
@@ -92,7 +99,8 @@ class AppMonitorService : Service() {
             Log.e(TAG, "startForeground error", e)
             try {
                 startForeground(NOTIFICATION_ID, initialNotification)
-            } catch (_: Exception) {
+            } catch (fallbackEx: Exception) {
+                Log.e(TAG, "startForeground fallback failed", fallbackEx)
             }
         }
 

@@ -21,6 +21,7 @@ import kotlin.math.sin
 object ExpressiveFeedbackEngine {
 
     private val audioExecutor = Executors.newSingleThreadExecutor()
+    private val queuedAudioTasks = java.util.concurrent.atomic.AtomicInteger(0)
 
     @Volatile
     var isSoundEnabled: Boolean = true
@@ -168,6 +169,8 @@ object ExpressiveFeedbackEngine {
         durationMs: Int,
         generator: (timeSeconds: Double, normalizedProgress: Double) -> Double
     ) {
+        if (queuedAudioTasks.get() >= 3) return
+        queuedAudioTasks.incrementAndGet()
         audioExecutor.execute {
             var track: AudioTrack? = null
             try {
@@ -211,6 +214,7 @@ object ExpressiveFeedbackEngine {
                 Thread.sleep((durationMs + 25).toLong())
             } catch (_: Throwable) {
             } finally {
+                queuedAudioTasks.decrementAndGet()
                 try {
                     track?.stop()
                 } catch (_: Throwable) {

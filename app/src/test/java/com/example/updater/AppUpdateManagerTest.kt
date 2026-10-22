@@ -22,6 +22,7 @@ class AppUpdateManagerTest {
         assertTrue(AppUpdateManager.isNewerVersion("v1.0.0", "v2.0.0"))
         assertTrue(AppUpdateManager.isNewerVersion("0.9.5", "1.0.0"))
         assertTrue(AppUpdateManager.isNewerVersion("1.1.0-alpha", "1.1.1"))
+        assertTrue(AppUpdateManager.isNewerVersion("1.1.0-beta", "1.1.0"))
     }
 
     @Test

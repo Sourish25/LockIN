@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.example.data.ChapterLockDatabase
 import com.example.data.ChapterLockRepository
 import com.example.data.SystemAppInspector
@@ -101,9 +102,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         }
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.e("NotificationActionReceiver", "Failed to handle notification action", e)
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
     }
