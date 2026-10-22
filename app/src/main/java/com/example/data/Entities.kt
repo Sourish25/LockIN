@@ -28,13 +28,16 @@ data class AppTimerRuleEntity(
             (usedMinutesToday.toFloat() / dailyLimitMinutes.toFloat()).coerceIn(0f, 1f)
         } else 0f
 
+    val blockDuringFocus: Boolean
+        get() = blockDuringReading
+
     fun isTemporarilyUnlocked(nowMs: Long = System.currentTimeMillis()): Boolean {
         return unlockedUntilEpochMs > nowMs
     }
 
-    fun isCurrentlyBlocked(isReadingSessionActive: Boolean, nowMs: Long = System.currentTimeMillis()): Boolean {
+    fun isCurrentlyBlocked(isFocusSessionActive: Boolean, nowMs: Long = System.currentTimeMillis()): Boolean {
         if (isTemporarilyUnlocked(nowMs)) return false
-        if (isReadingSessionActive && blockDuringReading) return true
+        if (isFocusSessionActive && blockDuringReading) return true
         if (isOverDailyBudget) return true
         return false
     }

@@ -93,7 +93,7 @@ import com.example.ui.components.SelectFocusExceptionsBottomSheet
 import com.example.ui.components.SystemPermissionsBottomSheet
 import com.example.ui.screens.AppVaultScreen
 import com.example.ui.screens.ExpressiveSettingsScreen
-import com.example.ui.screens.ReadAndLockScreen
+import com.example.ui.screens.FocusLockScreen
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LockInMotion
 import com.example.ui.theme.MyApplicationTheme
@@ -446,7 +446,7 @@ fun ChapterLockRoot(
                                         }
 
                                         AppTab.FOCUS_LOCK -> {
-                                            ReadAndLockScreen(
+                                            FocusLockScreen(
                                                 selectedFocusApp = uiState.selectedFocusApp,
                                                 activeSession = uiState.activeSession,
                                                 focusExceptionApps = uiState.focusExceptionApps,
@@ -746,7 +746,7 @@ internal fun ExpressiveTopBar(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Palette,
-                    contentDescription = "Switch Expressive / Wallpaper Palette",
+                    contentDescription = "Toggle Dynamic Wallpaper Palette",
                     tint = if (useDynamicWallpaper) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(20.dp)

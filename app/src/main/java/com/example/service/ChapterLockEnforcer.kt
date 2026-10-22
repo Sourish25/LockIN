@@ -169,9 +169,9 @@ object ChapterLockEnforcer {
         if (isFocusLockActive.get()) {
             val endTime = focusLockEndTimeMs.get()
             if (now < endTime) {
-                val allowedReaderPkg = pinnedFocusPackage.get()
+                val allowedFocusPkg = pinnedFocusPackage.get()
                 val isAllowedException = allowedFocusExceptionPackages.contains(cleanPkg)
-                if (!allowedReaderPkg.isNullOrBlank() && cleanPkg != allowedReaderPkg && !isAllowedException) {
+                if (!allowedFocusPkg.isNullOrBlank() && cleanPkg != allowedFocusPkg && !isAllowedException) {
                     val appName = appRulesMap[cleanPkg]?.appName
                         ?: knownAppLabels[cleanPkg]
                         ?: formatFallbackPackageName(cleanPkg)
@@ -235,19 +235,20 @@ object ChapterLockEnforcer {
     fun getPinnedAppName(): String = pinnedFocusAppName.get()
     fun getActiveFocusAppName(): String = pinnedFocusAppName.get()
     fun getPinnedAppPackage(): String? = pinnedFocusPackage.get()
-    fun getWhitelistedReaderPackage(): String = pinnedFocusPackage.get().orEmpty()
+    fun getPinnedFocusPackage(): String = pinnedFocusPackage.get().orEmpty()
+    fun getWhitelistedReaderPackage(): String = getPinnedFocusPackage()
     fun getCachedRulesSnapshot(): List<AppTimerRuleEntity> = appRulesMap.values.toList()
 
     fun updateFocusSessionState(
         isRunning: Boolean,
         endTimeEpochMillis: Long,
-        selectedReaderPkg: String,
-        selectedReaderName: String
+        selectedFocusPkg: String,
+        selectedFocusName: String
     ) {
         updateFocusLockState(
             active = isRunning,
-            pinnedPackage = selectedReaderPkg,
-            pinnedName = selectedReaderName,
+            pinnedPackage = selectedFocusPkg,
+            pinnedName = selectedFocusName,
             endTimeMs = endTimeEpochMillis
         )
     }

@@ -690,20 +690,20 @@ fun SelectFocusAppBottomSheet(
     val scrollIsolation = rememberSheetScrollIsolationConnection()
     var searchQuery by remember { mutableStateOf("") }
 
-    val allReaderCandidates = remember(pinnedFocusApps, discoveredApps, searchQuery) {
+    val allFocusCandidates = remember(pinnedFocusApps, discoveredApps, searchQuery) {
         val pinnedPkgs = pinnedFocusApps.map { it.packageName }.toSet()
-        val extraReaders = discoveredApps
+        val extraApps = discoveredApps
             .filter { it.packageName !in pinnedPkgs }
             .map {
                 PinnedFocusAppEntity(
                     packageName = it.packageName,
                     appName = it.appName,
-                    subtitle = if (it.isReaderApp) "Installed Reader App" else it.category,
+                    subtitle = it.category,
                     isSelected = false,
                     isInstalled = true
                 )
             }
-        val combined = pinnedFocusApps + extraReaders
+        val combined = pinnedFocusApps + extraApps
         if (searchQuery.isBlank()) {
             combined
         } else {
@@ -747,7 +747,7 @@ fun SelectFocusAppBottomSheet(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search installed readers or apps...") },
+                placeholder = { Text("Search installed apps...") },
                 leadingIcon = {
                     Icon(imageVector = Icons.Filled.Search, contentDescription = null)
                 },
@@ -777,7 +777,7 @@ fun SelectFocusAppBottomSheet(
                 contentPadding = PaddingValues(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(allReaderCandidates, key = { it.packageName }) { app ->
+                items(allFocusCandidates, key = { it.packageName }) { app ->
                     Surface(
                         color = if (app.isSelected) MaterialTheme.colorScheme.primaryContainer
                         else MaterialTheme.colorScheme.surfaceContainerLow,

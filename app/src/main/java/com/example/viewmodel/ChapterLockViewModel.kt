@@ -170,7 +170,7 @@ class ChapterLockViewModel(
 
     private val frictionPhrases = listOf(
         "I am consciously choosing to break my focus lock right now",
-        "My attention belongs to the chapter I started reading today",
+        "I choose intentional focus over mindless digital distractions",
         "I am overriding my screen time limit by deliberate choice"
     )
 

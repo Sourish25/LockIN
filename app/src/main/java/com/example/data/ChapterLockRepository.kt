@@ -83,7 +83,7 @@ class ChapterLockRepository(
     suspend fun getAllAppRulesOnce(): List<AppTimerRuleEntity> = dao.getAllAppRulesOnce()
 
     /**
-     * Synchronizes midnight daily counter resets, real installed reader apps,
+     * Synchronizes midnight daily counter resets, real installed focus apps,
      * and real UsageStats without seeding any fake or demo app limits.
      */
     suspend fun ensureSeededAndSynced() = syncMutex.withLock {

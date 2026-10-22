@@ -96,7 +96,7 @@ private val FOCUS_DURATION_ROWS = listOf(
 private val GiantStarburstShape = scallopedCookieShape(lobes = 12, waveDepthFraction = 0.065f)
 
 @Composable
-fun ReadAndLockScreen(
+fun FocusLockScreen(
     selectedFocusApp: PinnedFocusAppEntity?,
     activeSession: ActiveFocusSessionState,
     focusExceptionApps: List<FocusExceptionAppEntity> = emptyList(),
@@ -126,7 +126,7 @@ fun ReadAndLockScreen(
     val appSubtitle = if (hasAppSelected) {
         selectedFocusApp?.subtitle?.takeIf { it.isNotBlank() } ?: "Installed Focus App"
     } else {
-        "Tap to choose an installed reader or app"
+        "Tap to choose an installed app to lock into"
     }
     val appPackage = rawAppPackage
 
@@ -156,7 +156,7 @@ fun ReadAndLockScreen(
                     .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Left Pane: Pinned Reader App + 3x2 Duration Grid + Allowed Exceptions + Focus Telemetry
+                // Left Pane: Pinned Focus App + 3x2 Duration Grid + Allowed Exceptions + Focus Telemetry
                 Column(
                     modifier = Modifier
                         .weight(0.46f)
@@ -164,7 +164,7 @@ fun ReadAndLockScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 1. Pinned Reader App Card
+                    // 1. Pinned Focus App Card
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         shape = RoundedCornerShape(28.dp),
@@ -187,7 +187,7 @@ fun ReadAndLockScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "PINNED READER APP",
+                                    text = "IMMERSION FOCUS APP",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -273,7 +273,7 @@ fun ReadAndLockScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = if (hasAppSelected) "Change Reader App" else "Select Installed App",
+                                            text = if (hasAppSelected) "Change Focus App" else "Select Target App",
                                             style = MaterialTheme.typography.labelLarge
                                         )
                                     }
@@ -386,7 +386,7 @@ fun ReadAndLockScreen(
 
                     // 4. Focus Telemetry Card
                     FocusTelemetryCard(
-                        appName = if (hasAppSelected) appName else "Focus Reader",
+                        appName = if (hasAppSelected) appName else "Focus Target",
                         totalFocusedMinutes = selectedFocusApp?.totalFocusedMinutes ?: 0,
                         focusHistoryCount = focusHistoryCount
                     )
@@ -1454,7 +1454,7 @@ private fun FocusTelemetryCard(
                     text = if (focusHistoryCount > 0) {
                         "${formatMinutesClean(totalFocusedMinutes)} immersed • $focusHistoryCount sessions"
                     } else {
-                        "${formatMinutesClean(totalFocusedMinutes)} immersed reading"
+                        "${formatMinutesClean(totalFocusedMinutes)} immersed focus"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1465,3 +1465,39 @@ private fun FocusTelemetryCard(
         }
     }
 }
+
+/**
+ * Backward compatibility alias for [FocusLockScreen].
+ */
+@Composable
+fun ReadAndLockScreen(
+    selectedFocusApp: PinnedFocusAppEntity?,
+    activeSession: ActiveFocusSessionState,
+    focusExceptionApps: List<FocusExceptionAppEntity> = emptyList(),
+    focusHistoryCount: Int = 0,
+    isTablet: Boolean,
+    onSelectDuration: (Int) -> Unit,
+    onStartFocusLock: () -> Unit,
+    onLaunchPinnedApp: (String) -> Unit,
+    onLaunchExceptionApp: (String) -> Unit = {},
+    onExtendFocusLock: () -> Unit = {},
+    onRequestQuitFocusEarly: () -> Unit,
+    onOpenSelectFocusAppSheet: () -> Unit,
+    onOpenSelectFocusExceptionsSheet: () -> Unit = {},
+    modifier: Modifier = Modifier
+) = FocusLockScreen(
+    selectedFocusApp = selectedFocusApp,
+    activeSession = activeSession,
+    focusExceptionApps = focusExceptionApps,
+    focusHistoryCount = focusHistoryCount,
+    isTablet = isTablet,
+    onSelectDuration = onSelectDuration,
+    onStartFocusLock = onStartFocusLock,
+    onLaunchPinnedApp = onLaunchPinnedApp,
+    onLaunchExceptionApp = onLaunchExceptionApp,
+    onExtendFocusLock = onExtendFocusLock,
+    onRequestQuitFocusEarly = onRequestQuitFocusEarly,
+    onOpenSelectFocusAppSheet = onOpenSelectFocusAppSheet,
+    onOpenSelectFocusExceptionsSheet = onOpenSelectFocusExceptionsSheet,
+    modifier = modifier
+)

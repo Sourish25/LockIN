@@ -418,13 +418,12 @@ class SystemAppInspector(val context: Context) {
                 val pkg = info.activityInfo?.packageName ?: continue
                 if (pkg == context.packageName || pkg in nonBlockableSystemPackages) continue
                 val label = info.loadLabel(pm)?.toString()?.takeIf { it.isNotBlank() } ?: pkg
-                val isReader = isKnownReaderApp(pkg, label)
                 installedMap[pkg] = DiscoveredDeviceApp(
                     packageName = pkg,
                     appName = label,
-                    category = if (isReader) "Reader" else categorizePackage(pkg, label),
+                    category = categorizePackage(pkg, label),
                     isInstalledOnDevice = true,
-                    isReaderApp = isReader,
+                    isReaderApp = isKnownReaderApp(pkg, label),
                     usedMinutesToday = usageMap[pkg] ?: 0
                 )
             }
@@ -440,13 +439,12 @@ class SystemAppInspector(val context: Context) {
                 if (installedMap.containsKey(pkg)) continue
                 if (pm.getLaunchIntentForPackage(pkg) != null) {
                     val label = pm.getApplicationLabel(appInfo)?.toString()?.takeIf { it.isNotBlank() } ?: pkg
-                    val isReader = isKnownReaderApp(pkg, label)
                     installedMap[pkg] = DiscoveredDeviceApp(
                         packageName = pkg,
                         appName = label,
-                        category = if (isReader) "Reader" else categorizePackage(pkg, label),
+                        category = categorizePackage(pkg, label),
                         isInstalledOnDevice = true,
-                        isReaderApp = isReader,
+                        isReaderApp = isKnownReaderApp(pkg, label),
                         usedMinutesToday = usageMap[pkg] ?: 0
                     )
                 }
@@ -456,7 +454,6 @@ class SystemAppInspector(val context: Context) {
 
         return installedMap.values.sortedWith(
             compareByDescending<DiscoveredDeviceApp> { it.usedMinutesToday }
-                .thenByDescending { it.isReaderApp }
                 .thenBy { it.appName.lowercase() }
         )
     }
@@ -485,12 +482,15 @@ class SystemAppInspector(val context: Context) {
         return when {
             "gpay" in lower || "google pay" in lower || "paisa" in lower || "wallet" in lower || "phonepe" in lower || "paytm" in lower || "bank" in lower -> "Payments & Banking"
             "dialer" in lower || "phone" in lower || "contacts" in lower || "emergency" in lower || "messages" in lower || "mms" in lower || "authenticator" in lower -> "Emergency & Calls"
-            "youtube" in lower || "netflix" in lower || "video" in lower || "twitch" in lower || "bilibili" in lower -> "Video"
-            "instagram" in lower || "twitter" in lower || "facebook" in lower || "threads" in lower || "discord" in lower || "whatsapp" in lower || "telegram" in lower -> "Social"
+            "duolingo" in lower || "anki" in lower || "khan" in lower || "coursera" in lower || "udemy" in lower || "quizlet" in lower || "edx" in lower || "brilliant" in lower || "learn" in lower || "study" in lower -> "Education & Learning"
+            "notion" in lower || "obsidian" in lower || "evernote" in lower || "onenote" in lower || "docs" in lower || "sheets" in lower || "tasks" in lower || "todoist" in lower || "ticktick" in lower || "termux" in lower || "keep" in lower -> "Productivity & Tools"
+            "reader" in lower || "novel" in lower || "book" in lower || "kindle" in lower || "mihon" in lower || "tachiyomi" in lower || "readera" in lower || "kobo" in lower || "webnovel" in lower || "epub" in lower || "manga" in lower || "aniyomi" in lower || "kotatsu" in lower || "lnreader" in lower || "shosetsu" in lower || "librera" in lower || "fbreader" in lower || "lithium" in lower -> "Reading & Books"
+            "youtube" in lower || "netflix" in lower || "video" in lower || "twitch" in lower || "bilibili" in lower || "prime" in lower || "disney" in lower || "hotstar" in lower -> "Video & Streaming"
+            "instagram" in lower || "twitter" in lower || "facebook" in lower || "threads" in lower || "discord" in lower || "whatsapp" in lower || "telegram" in lower || "snapchat" in lower -> "Social & Messaging"
             "tiktok" in lower || "musical" in lower || "reel" in lower || "shorts" in lower -> "Short Video"
-            "reddit" in lower || "news" in lower || "forum" in lower || "quora" in lower -> "Forums"
-            "chrome" in lower || "browser" in lower || "firefox" in lower || "brave" in lower || "opera" in lower -> "Browser"
-            "game" in lower || "genshin" in lower || "roblox" in lower || "clash" in lower -> "Game"
+            "reddit" in lower || "news" in lower || "forum" in lower || "quora" in lower -> "Forums & News"
+            "chrome" in lower || "browser" in lower || "firefox" in lower || "brave" in lower || "opera" in lower || "edge" in lower -> "Browser"
+            "game" in lower || "genshin" in lower || "roblox" in lower || "clash" in lower || "steam" in lower -> "Games"
             else -> "Installed App"
         }
     }

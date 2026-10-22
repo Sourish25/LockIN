@@ -94,7 +94,7 @@ fun FrictionShieldOverlay(
 
     val title = when (challenge.reason) {
         FrictionReason.QUIT_FOCUS_LOCK_EARLY ->
-            "Stay in ${challenge.targetAppName ?: "your reader"}?"
+            "Stay in ${challenge.targetAppName ?: "your focus app"}?"
         FrictionReason.UNLOCK_BLOCKED_APP ->
             "${challenge.targetAppName ?: "App"} is blocked for today"
         FrictionReason.EDIT_LOCKED_APP_SETTINGS ->
@@ -103,7 +103,7 @@ fun FrictionShieldOverlay(
 
     val subtitle = when (challenge.reason) {
         FrictionReason.QUIT_FOCUS_LOCK_EARLY ->
-            "To prevent subconscious quitting mid-chapter, solve the puzzle only if you truly need to exit."
+            "To break impulsive context-switching, solve the puzzle only if you truly need to exit early."
         FrictionReason.UNLOCK_BLOCKED_APP ->
             "You reached your daily limit. Solve the puzzle to grant a 10-minute override."
         FrictionReason.EDIT_LOCKED_APP_SETTINGS ->
@@ -117,7 +117,7 @@ fun FrictionShieldOverlay(
     }
 
     val returnLabel = if (challenge.reason == FrictionReason.QUIT_FOCUS_LOCK_EARLY) {
-        "Keep Reading (${challenge.targetAppName ?: "Locked"})"
+        "Stay Focused (${challenge.targetAppName ?: "Active"})"
     } else {
         "Keep App Locked"
     }

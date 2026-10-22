@@ -47,8 +47,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 when (action) {
                     ACTION_OPEN_PINNED_APP -> {
                         val pkg = intent.getStringExtra(EXTRA_PACKAGE_NAME)
-                            ?.ifBlank { ChapterLockEnforcer.getWhitelistedReaderPackage() }
-                            ?: ChapterLockEnforcer.getWhitelistedReaderPackage()
+                            ?.ifBlank { ChapterLockEnforcer.getPinnedFocusPackage() }
+                            ?: ChapterLockEnforcer.getPinnedFocusPackage()
                         if (pkg.isNotBlank()) {
                             val launchIntent = repo.createLaunchIntent(pkg)
                             if (launchIntent != null) {

@@ -64,7 +64,7 @@ object LockNotificationManager {
             "Screen Time Warnings & Session Milestones",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Alerts when an app has 5 minutes left today or when a reading Focus Lock finishes."
+            description = "Alerts when an app has 5 minutes left today or when a Focus Lock session finishes."
             enableVibration(true)
         }
 
@@ -95,7 +95,7 @@ object LockNotificationManager {
 
         val focusActive = ChapterLockEnforcer.isFocusModeCurrentlyActive()
         val endTimeMillis = ChapterLockEnforcer.getFocusEndTimeEpochMillis()
-        val pinnedPackage = ChapterLockEnforcer.getWhitelistedReaderPackage()
+        val pinnedPackage = ChapterLockEnforcer.getPinnedFocusPackage()
         val pinnedAppName = ChapterLockEnforcer.getActiveFocusAppName().ifBlank { "Focus App" }
 
         if (focusActive && endTimeMillis > System.currentTimeMillis()) {

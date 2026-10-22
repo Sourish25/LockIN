@@ -104,7 +104,7 @@ fun AppVaultScreen(
     val quickLimitCandidates = remember(discoveredApps, appRules) {
         val existingPkgs = appRules.map { it.packageName }.toSet()
         discoveredApps
-            .filter { it.packageName !in existingPkgs && !it.isReaderApp }
+            .filter { it.packageName !in existingPkgs }
             .sortedWith(
                 compareByDescending<DiscoveredDeviceApp> { it.usedMinutesToday }
                     .thenByDescending { it.category != "Installed App" }

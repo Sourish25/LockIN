@@ -490,7 +490,7 @@ fun ExpressiveUpdateModalSheet(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Version ${BuildConfig.VERSION_NAME} includes all recent Material 3 Expressive refinements, bottom sheet touch guards, and slot machine clock reels.",
+                                text = "Version ${BuildConfig.VERSION_NAME} includes all recent focus enhancements, nested settings, improved permission flow, and performance optimizations.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

@@ -339,7 +339,7 @@ private fun SettingsOverviewContent(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Material 3 Expressive • 100% On-Device Privacy",
+                    text = "Local-First • 100% On-Device Privacy",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -484,7 +484,7 @@ private fun ProtectionPermissionsContent(
         item(key = "perm_overlay") {
             ExpressiveSettingItem(
                 title = "Display Over Other Apps",
-                subtitle = "Draws the instant Material 3 friction shield over blocked applications",
+                subtitle = "Surfaces the focus shield and cognitive friction puzzles over blocked applications",
                 isGranted = hasOverlay,
                 icon = Icons.Filled.Security,
                 shape = expressiveGroupedCardShape(index = 2, totalCount = 3),

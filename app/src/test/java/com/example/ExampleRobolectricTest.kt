@@ -61,7 +61,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `app timer rule blocks when daily limit is reached or reading session is active`() {
+    fun `app timer rule blocks when daily limit is reached or focus session is active`() {
         val ruleUnderBudget = AppTimerRuleEntity(
             packageName = "com.instagram.android",
             appName = "Instagram",
@@ -70,11 +70,11 @@ class ExampleRobolectricTest {
             usedMinutesToday = 45,
             blockDuringReading = true
         )
-        assertFalse(ruleUnderBudget.isCurrentlyBlocked(isReadingSessionActive = false))
-        assertTrue(ruleUnderBudget.isCurrentlyBlocked(isReadingSessionActive = true))
+        assertFalse(ruleUnderBudget.isCurrentlyBlocked(isFocusSessionActive = false))
+        assertTrue(ruleUnderBudget.isCurrentlyBlocked(isFocusSessionActive = true))
 
         val ruleOverBudget = ruleUnderBudget.copy(usedMinutesToday = 60)
-        assertTrue(ruleOverBudget.isCurrentlyBlocked(isReadingSessionActive = false))
+        assertTrue(ruleOverBudget.isCurrentlyBlocked(isFocusSessionActive = false))
     }
 
     @Test
