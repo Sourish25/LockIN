@@ -29,14 +29,18 @@ data class AppReleaseInfo(
     val downloadUrl: String,
     val targetAbi: String,
     val assetSize: Long,
-    val sha256Checksum: String? = null
+    val sha256Checksum: String? = null,
+    val assetId: Long = 0L,
+    val assetUpdatedAt: String = "",
+    val assetUpdatedAtMs: Long = 0L,
+    val isSameVersionRebuild: Boolean = false
 )
 
 sealed interface UpdateState {
     object Idle : UpdateState
     object Checking : UpdateState
     data class UpdateAvailable(val release: AppReleaseInfo) : UpdateState
-    object UpToDate : UpdateState
+    data class UpToDate(val latestRelease: AppReleaseInfo? = null) : UpdateState
     data class Downloading(
         val release: AppReleaseInfo,
         val bytesDownloaded: Long,
@@ -55,9 +59,16 @@ class AppUpdateManager(private val context: Context) {
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
 
+    private val prefs by lazy {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
     companion object {
         const val DEFAULT_REPO = "Sourish25/LockIN"
         const val GITHUB_API_URL = "https://api.github.com/repos"
+        const val PREFS_NAME = "lockin_updater_prefs"
+        const val KEY_LAST_INSTALLED_ASSET_ID = "last_installed_asset_id"
+        const val KEY_LAST_INSTALLED_ASSET_TIME = "last_installed_asset_time"
 
         fun isNewerVersion(currentVersion: String, remoteVersion: String): Boolean {
             val currClean = currentVersion.trimStart('v').trim()
@@ -87,6 +98,66 @@ class AppUpdateManager(private val context: Context) {
             if (!currPre && remPre) return false
 
             return false
+        }
+
+        fun isSameOrEquivalentVersion(versionA: String, versionB: String): Boolean {
+            val aClean = versionA.trimStart('v').trim().split("-")[0]
+            val bClean = versionB.trimStart('v').trim().split("-")[0]
+            val aParts = aClean.split(".").mapNotNull { it.toIntOrNull() }
+            val bParts = bClean.split(".").mapNotNull { it.toIntOrNull() }
+            val maxLen = maxOf(aParts.size, bParts.size)
+            for (i in 0 until maxLen) {
+                val a = aParts.getOrElse(i) { 0 }
+                val b = bParts.getOrElse(i) { 0 }
+                if (a != b) return false
+            }
+            return true
+        }
+
+        fun parseIso8601ToEpochMs(isoString: String): Long {
+            if (isoString.isBlank()) return 0L
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    return java.time.Instant.parse(isoString).toEpochMilli()
+                } catch (_: Exception) {
+                    try {
+                        return java.time.OffsetDateTime.parse(isoString).toInstant().toEpochMilli()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+            val patterns = arrayOf(
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                "yyyy-MM-dd'T'HH:mm:ssXXX"
+            )
+            for (pat in patterns) {
+                try {
+                    val sdf = java.text.SimpleDateFormat(pat, java.util.Locale.US)
+                    sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    val date = sdf.parse(isoString)
+                    if (date != null) return date.time
+                } catch (_: Exception) {
+                }
+            }
+            return 0L
+        }
+
+        fun getLocalAppInstallTime(context: Context): Long {
+            return try {
+                val pi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    context.packageManager.getPackageInfo(
+                        context.packageName,
+                        android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.packageManager.getPackageInfo(context.packageName, 0)
+                }
+                maxOf(pi.lastUpdateTime, pi.firstInstallTime)
+            } catch (_: Exception) {
+                0L
+            }
         }
 
         fun resolveBestApkAsset(
@@ -136,7 +207,7 @@ class AppUpdateManager(private val context: Context) {
         }
     }
 
-    suspend fun checkForUpdates(customRepo: String? = null) {
+    suspend fun checkForUpdates(customRepo: String? = null, forceUpdate: Boolean = false) {
         _updateState.value = UpdateState.Checking
         withContext(Dispatchers.IO) {
             try {
@@ -164,7 +235,7 @@ class AppUpdateManager(private val context: Context) {
 
                 if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
                     // Try fetching all releases if latest is not tagged as latest
-                    fetchFirstAvailableRelease(repo)
+                    fetchFirstAvailableRelease(repo, forceUpdate)
                     return@withContext
                 }
 
@@ -174,7 +245,7 @@ class AppUpdateManager(private val context: Context) {
                 }
 
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
-                parseReleaseJson(JSONObject(responseText))
+                parseReleaseJson(JSONObject(responseText), forceUpdate)
             } catch (e: Exception) {
                 _updateState.value = UpdateState.Error(
                     e.localizedMessage ?: "Failed to check for updates. Check internet connection."
@@ -183,7 +254,7 @@ class AppUpdateManager(private val context: Context) {
         }
     }
 
-    private suspend fun fetchFirstAvailableRelease(repo: String) {
+    private suspend fun fetchFirstAvailableRelease(repo: String, forceUpdate: Boolean = false) {
         try {
             val url = URL("$GITHUB_API_URL/$repo/releases")
             val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -201,33 +272,35 @@ class AppUpdateManager(private val context: Context) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val releases = JSONArray(responseText)
                 if (releases.length() > 0) {
-                    parseReleaseJson(releases.getJSONObject(0))
+                    parseReleaseJson(releases.getJSONObject(0), forceUpdate)
                     return
                 }
             }
-            _updateState.value = UpdateState.UpToDate
+            _updateState.value = UpdateState.UpToDate()
         } catch (e: Exception) {
             _updateState.value = UpdateState.Error("No releases found on GitHub: ${e.message}")
         }
     }
 
-    private fun parseReleaseJson(releaseObj: JSONObject) {
+    fun parseReleaseJson(
+        releaseObj: JSONObject,
+        forceUpdate: Boolean = false,
+        localInstallTimeOverrideMs: Long? = null
+    ) {
         val tagName = releaseObj.optString("tag_name", "")
         val remoteVersion = tagName.trimStart('v')
         val currentVersion = BuildConfig.VERSION_NAME
-
-        val isNewer = isNewerVersion(currentVersion, remoteVersion)
-        if (!isNewer && tagName.isNotBlank()) {
-            _updateState.value = UpdateState.UpToDate
-            return
-        }
 
         val assetsJson = releaseObj.optJSONArray("assets") ?: JSONArray()
         val assetsList = (0 until assetsJson.length()).map { assetsJson.getJSONObject(it) }
 
         val bestApk = resolveBestApkAsset(assetsList, Build.SUPPORTED_ABIS)
         if (bestApk == null) {
-            _updateState.value = UpdateState.Error("No compatible APK found in release $tagName")
+            if (isNewerVersion(currentVersion, remoteVersion)) {
+                _updateState.value = UpdateState.Error("No compatible APK found in release $tagName")
+            } else {
+                _updateState.value = UpdateState.UpToDate()
+            }
             return
         }
 
@@ -235,9 +308,29 @@ class AppUpdateManager(private val context: Context) {
         val targetAbi = bestApk.second
         val downloadUrl = apkAsset.optString("browser_download_url")
         val assetSize = apkAsset.optLong("size", 0L)
+        val assetId = apkAsset.optLong("id", 0L)
+        val assetUpdatedAt = apkAsset.optString(
+            "updated_at",
+            releaseObj.optString("published_at", releaseObj.optString("created_at", ""))
+        )
+        val assetUpdatedAtMs = parseIso8601ToEpochMs(assetUpdatedAt)
         val releaseTitle = releaseObj.optString("name", "Version $tagName")
         val changelog = releaseObj.optString("body", "Bug fixes and performance improvements.")
         val publishedAt = releaseObj.optString("published_at", "")
+
+        val localInstallTimeMs = localInstallTimeOverrideMs ?: getLocalAppInstallTime(context)
+        val lastSavedAssetId = prefs.getLong(KEY_LAST_INSTALLED_ASSET_ID, -1L)
+
+        val isSemverNewer = isNewerVersion(currentVersion, remoteVersion)
+        val isSameVersion = isSameOrEquivalentVersion(currentVersion, remoteVersion)
+
+        // Asset is considered a newer rebuild if:
+        // 1. Asset was updated after app installation (+5s grace to account for install duration)
+        // 2. OR asset ID differs from the last installed asset ID recorded by the in-app updater
+        val isAssetNewer = (assetUpdatedAtMs > 0L && localInstallTimeMs > 0L && assetUpdatedAtMs > (localInstallTimeMs + 5_000L)) ||
+            (assetId != 0L && lastSavedAssetId != -1L && assetId != lastSavedAssetId)
+
+        val isSameVersionRebuild = isSameVersion && isAssetNewer
 
         val releaseInfo = AppReleaseInfo(
             tagName = tagName,
@@ -247,10 +340,20 @@ class AppUpdateManager(private val context: Context) {
             publishedAt = publishedAt,
             downloadUrl = downloadUrl,
             targetAbi = targetAbi,
-            assetSize = assetSize
+            assetSize = assetSize,
+            assetId = assetId,
+            assetUpdatedAt = assetUpdatedAt,
+            assetUpdatedAtMs = assetUpdatedAtMs,
+            isSameVersionRebuild = isSameVersionRebuild
         )
 
-        _updateState.value = UpdateState.UpdateAvailable(releaseInfo)
+        if (isSemverNewer) {
+            _updateState.value = UpdateState.UpdateAvailable(releaseInfo.copy(isSameVersionRebuild = false))
+        } else if (isSameVersionRebuild || forceUpdate) {
+            _updateState.value = UpdateState.UpdateAvailable(releaseInfo.copy(isSameVersionRebuild = true))
+        } else {
+            _updateState.value = UpdateState.UpToDate(latestRelease = releaseInfo)
+        }
     }
 
     suspend fun startDownload(release: AppReleaseInfo) {
@@ -368,6 +471,13 @@ class AppUpdateManager(private val context: Context) {
         if (!apkFile.exists() || !isValidApkArchive(apkFile)) {
             _updateState.value = UpdateState.Error("APK file missing or corrupted, please download again")
             return
+        }
+
+        if (release.assetId != 0L) {
+            prefs.edit()
+                .putLong(KEY_LAST_INSTALLED_ASSET_ID, release.assetId)
+                .putLong(KEY_LAST_INSTALLED_ASSET_TIME, release.assetUpdatedAtMs)
+                .apply()
         }
 
         // On Android 8.0+ verify package install permission

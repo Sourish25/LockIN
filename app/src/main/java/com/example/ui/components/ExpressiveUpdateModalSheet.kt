@@ -191,7 +191,10 @@ fun ExpressiveUpdateModalSheet(
                     Text(
                         text = when (updateState) {
                             is UpdateState.Checking -> "Checking for updates..."
-                            is UpdateState.UpdateAvailable -> "New Update Available"
+                            is UpdateState.UpdateAvailable -> {
+                                if (updateState.release.isSameVersionRebuild) "Updated Build Available"
+                                else "New Update Available"
+                            }
                             is UpdateState.Downloading -> "Downloading Update"
                             is UpdateState.Verifying -> "Verifying Package"
                             is UpdateState.ReadyToInstall -> "Update Ready to Install"
@@ -204,7 +207,11 @@ fun ExpressiveUpdateModalSheet(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Current: v${BuildConfig.VERSION_NAME} • Installed",
+                        text = when {
+                            updateState is UpdateState.UpdateAvailable && updateState.release.isSameVersionRebuild ->
+                                "Same version with new fixes & enhancements"
+                            else -> "Current: v${BuildConfig.VERSION_NAME} • Installed"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -497,15 +504,39 @@ fun ExpressiveUpdateModalSheet(
                         }
                     }
 
-                    FilledTonalButton(
-                        onClick = {
-                            ExpressiveFeedbackEngine.playPillTap(context)
-                            onDismiss()
-                        },
-                        shape = CircleShape,
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("Done")
+                        FilledTonalButton(
+                            onClick = {
+                                ExpressiveFeedbackEngine.playPillTap(context)
+                                onDismiss()
+                            },
+                            shape = CircleShape,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Done")
+                        }
+
+                        if (updateState.latestRelease != null) {
+                            Button(
+                                onClick = {
+                                    ExpressiveFeedbackEngine.playPillTap(context)
+                                    onDownloadClick(updateState.latestRelease)
+                                },
+                                shape = CircleShape,
+                                modifier = Modifier.weight(1.4f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.ArrowDownward,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Reinstall Build")
+                            }
+                        }
                     }
                 }
 
@@ -646,7 +677,7 @@ private fun UpdateReleaseCard(release: AppReleaseInfo) {
                     shape = CircleShape
                 ) {
                     Text(
-                        text = release.tagName,
+                        text = if (release.isSameVersionRebuild) "New Build • ${release.tagName}" else release.tagName,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,

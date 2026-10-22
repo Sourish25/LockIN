@@ -246,9 +246,9 @@ class ChapterLockViewModel(
         }
     }
 
-    fun checkForUpdates() {
+    fun checkForUpdates(forceUpdate: Boolean = false) {
         viewModelScope.launch {
-            repository.updateManager.checkForUpdates()
+            repository.updateManager.checkForUpdates(forceUpdate = forceUpdate)
         }
     }
 

@@ -493,7 +493,8 @@ fun ChapterLockRoot(
                                                 onOpenXiaomiAutostartSettings = if (uiState.isXiaomiDevice) onLaunchXiaomiAutostart else null,
                                                 onOpenExceptionsSheet = { viewModel.setShowSelectFocusExceptionsSheet(true) },
                                                 onSelectDurationMinutes = viewModel::selectFocusDuration,
-                                                onCheckForUpdates = viewModel::checkForUpdates
+                                                onCheckForUpdates = viewModel::checkForUpdates,
+                                                onDownloadRelease = viewModel::startUpdateDownload
                                             )
                                         }
                                     }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
@@ -51,6 +52,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -132,6 +134,7 @@ fun ExpressiveSettingsScreen(
     onOpenExceptionsSheet: () -> Unit,
     onSelectDurationMinutes: (Int) -> Unit,
     onCheckForUpdates: () -> Unit,
+    onDownloadRelease: (AppReleaseInfo) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var activeSubCategory by rememberSaveable { mutableStateOf<SettingsSubCategory?>(null) }
@@ -218,7 +221,8 @@ fun ExpressiveSettingsScreen(
                         ExpressiveFeedbackEngine.playPillTap(context)
                         activeSubCategory = null
                     },
-                    onCheckForUpdates = onCheckForUpdates
+                    onCheckForUpdates = onCheckForUpdates,
+                    onDownloadRelease = onDownloadRelease
                 )
             }
         }
@@ -815,7 +819,8 @@ private fun UpdatesAndAboutContent(
     updateState: UpdateState,
     isTablet: Boolean,
     onBackClick: () -> Unit,
-    onCheckForUpdates: () -> Unit
+    onCheckForUpdates: () -> Unit,
+    onDownloadRelease: (AppReleaseInfo) -> Unit = {}
 ) {
     val context = LocalContext.current
     val isChecking = updateState is UpdateState.Checking
@@ -900,8 +905,14 @@ private fun UpdatesAndAboutContent(
                     Text(
                         text = when (updateState) {
                             is UpdateState.Checking -> "Checking GitHub releases repository for new APK builds..."
-                            is UpdateState.UpdateAvailable -> "New version ${updateState.release.tagName} is available with improvements and fixes!"
-                            is UpdateState.UpToDate -> "You are on the latest official build. No update needed."
+                            is UpdateState.UpdateAvailable -> {
+                                if (updateState.release.isSameVersionRebuild) {
+                                    "New build for ${updateState.release.tagName} is available with recent improvements!"
+                                } else {
+                                    "New version ${updateState.release.tagName} is available with improvements and fixes!"
+                                }
+                            }
+                            is UpdateState.UpToDate -> "You are on the latest official build (v${BuildConfig.VERSION_NAME}). All features up to date."
                             is UpdateState.Error -> "Update check error: ${updateState.message}"
                             else -> "Stay up to date with multi-ABI releases directly from GitHub."
                         },
@@ -933,6 +944,25 @@ private fun UpdatesAndAboutContent(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = if (isUpdateAvailable) "View & Install Update" else "Check for Updates",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+
+                    if (updateState is UpdateState.UpToDate && updateState.latestRelease != null) {
+                        OutlinedButton(
+                            onClick = { onDownloadRelease(updateState.latestRelease) },
+                            shape = CircleShape,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowDownward,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Reinstall Latest Build (${updateState.latestRelease.tagName})",
                                 style = MaterialTheme.typography.labelLarge
                             )
                         }

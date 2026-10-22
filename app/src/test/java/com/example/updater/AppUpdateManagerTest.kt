@@ -1,5 +1,8 @@
 package com.example.updater
 
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -76,6 +79,99 @@ class AppUpdateManagerTest {
         val match = AppUpdateManager.resolveBestApkAsset(assets, supportedAbis)
 
         assertEquals(null, match)
+    }
+
+    @Test
+    fun testIsSameOrEquivalentVersion() {
+        assertTrue(AppUpdateManager.isSameOrEquivalentVersion("1.2.0", "v1.2.0"))
+        assertTrue(AppUpdateManager.isSameOrEquivalentVersion("1.2", "1.2.0"))
+        assertTrue(AppUpdateManager.isSameOrEquivalentVersion("v1.2.0", "1.2.0"))
+        assertTrue(AppUpdateManager.isSameOrEquivalentVersion("1.2.0-beta", "1.2.0"))
+        assertFalse(AppUpdateManager.isSameOrEquivalentVersion("1.2.0", "1.2.1"))
+        assertFalse(AppUpdateManager.isSameOrEquivalentVersion("1.2.0", "2.0.0"))
+    }
+
+    @Test
+    fun testParseIso8601ToEpochMs() {
+        val epochMs = AppUpdateManager.parseIso8601ToEpochMs("2026-10-22T12:00:00Z")
+        assertTrue("Epoch ms should be positive", epochMs > 0L)
+        // Verify 2026-10-22 timestamp falls within year 2026 range
+        val expectedMin = 1767225600000L // 2026-01-01
+        val expectedMax = 1798761600000L // 2027-01-01
+        assertTrue(epochMs in expectedMin..expectedMax)
+    }
+
+    @Test
+    fun testParseReleaseJson_detectsSameVersionRebuildWhenAssetIsNewer() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val updateManager = AppUpdateManager(context)
+
+        // Remote release has the same tag "v1.2.0" as BuildConfig.VERSION_NAME "1.2.0"
+        // But the asset was uploaded in late 2026, which is newer than local package install time (1000L)
+        val releaseJson = JSONObject("""
+            {
+                "tag_name": "v1.2.0",
+                "name": "LockIN Maintenance Rebuild",
+                "body": "Fixed in-app update detection on same version tags.",
+                "published_at": "2026-10-22T21:00:00Z",
+                "assets": [
+                    {
+                        "id": 998877,
+                        "name": "LockIN-v1.2.0-arm64-v8a.apk",
+                        "size": 16500000,
+                        "updated_at": "2026-10-22T21:10:00Z",
+                        "browser_download_url": "https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-arm64-v8a.apk"
+                    }
+                ]
+            }
+        """.trimIndent())
+
+        updateManager.parseReleaseJson(releaseJson, localInstallTimeOverrideMs = 1000L)
+
+        val state = updateManager.updateState.value
+        assertTrue("State should be UpdateAvailable for rebuild", state is UpdateState.UpdateAvailable)
+        val release = (state as UpdateState.UpdateAvailable).release
+        assertTrue("isSameVersionRebuild should be true", release.isSameVersionRebuild)
+        assertEquals("v1.2.0", release.tagName)
+        assertEquals("1.2.0", release.versionName)
+        assertEquals(998877L, release.assetId)
+        assertTrue(release.downloadUrl.contains("LockIN-v1.2.0-arm64-v8a.apk"))
+    }
+
+    @Test
+    fun testParseReleaseJson_forceUpdateTriggersUpdateAvailable() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val updateManager = AppUpdateManager(context)
+
+        val releaseJson = JSONObject("""
+            {
+                "tag_name": "v1.2.0",
+                "name": "LockIN Current Release",
+                "body": "Existing release payload.",
+                "published_at": "2020-01-01T00:00:00Z",
+                "assets": [
+                    {
+                        "id": 112233,
+                        "name": "LockIN-v1.2.0-arm64-v8a.apk",
+                        "size": 16000000,
+                        "updated_at": "2020-01-01T00:00:00Z",
+                        "browser_download_url": "https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-arm64-v8a.apk"
+                    }
+                ]
+            }
+        """.trimIndent())
+
+        // Without forceUpdate, installed time is newer (e.g. 2026) -> UpToDate
+        val nowMs = AppUpdateManager.parseIso8601ToEpochMs("2026-10-22T21:00:00Z")
+        updateManager.parseReleaseJson(releaseJson, forceUpdate = false, localInstallTimeOverrideMs = nowMs)
+        val upToDateState = updateManager.updateState.value
+        assertTrue("State should be UpToDate", upToDateState is UpdateState.UpToDate)
+        assertNotNull((upToDateState as UpdateState.UpToDate).latestRelease)
+
+        // With forceUpdate = true -> UpdateAvailable
+        updateManager.parseReleaseJson(releaseJson, forceUpdate = true, localInstallTimeOverrideMs = nowMs)
+        val forcedState = updateManager.updateState.value
+        assertTrue("State should be UpdateAvailable with forceUpdate", forcedState is UpdateState.UpdateAvailable)
     }
 
     @Test
