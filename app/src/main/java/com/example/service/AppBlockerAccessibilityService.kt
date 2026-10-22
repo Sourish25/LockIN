@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
@@ -129,30 +130,25 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 3. Continuous 500ms active window, live usage, and PiP/multi-window enforcement loop
+        // 3. Periodic background sync and PiP window cleanup loop (2000ms cadence)
         enforcementLoopJob?.cancel()
         enforcementLoopJob = serviceScope.launch {
             var tick = 0L
             while (isActive) {
                 try {
-                    if (tick % 4L == 0L) {
+                    if (tick % 3L == 0L) {
                         repo.syncSystemUsageStats()
                         LockNotificationManager.checkAndNotifyLimitMilestones(
                             applicationContext,
                             repo.getAllAppRulesOnce()
                         )
                     }
-                    val fgPkg = inspector.queryCurrentForegroundPackage()
-                    if (!fgPkg.isNullOrBlank()) {
-                        currentForegroundPackage = fgPkg
-                        inspectAndEnforcePackage(fgPkg)
-                    }
-                    // Also inspect interactive windows to detect split-screen or background PiP
+                    // Scan interactive windows for Picture-in-Picture floating windows
                     inspectInteractiveWindows()
                 } catch (_: Exception) {
                 }
                 tick++
-                delay(500L)
+                delay(2000L)
             }
         }
     }
@@ -178,29 +174,29 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             return
         }
 
-        // When windows change (e.g. PiP opened or split-screen initiated), inspect all windows!
         if (type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
             inspectInteractiveWindows()
+            return
         }
 
         val candidatePkg = event.packageName?.toString()?.takeIf { it.isNotBlank() }
             ?: return
 
-        // Do not update foreground package if event is from soft keyboard or system notification shade
-        if (candidatePkg != "com.android.systemui" &&
-            !candidatePkg.contains("inputmethod", ignoreCase = true)
+        // Do not update foreground package or enforce if event is from soft keyboard or system notification shade
+        if (candidatePkg == "com.android.systemui" ||
+            candidatePkg.contains("inputmethod", ignoreCase = true)
         ) {
-            currentForegroundPackage = candidatePkg
+            return
         }
 
+        currentForegroundPackage = candidatePkg
         inspectAndEnforcePackage(candidatePkg)
     }
 
     /**
      * Intercepts hardware and virtual keys when Focus Lock is active:
-     * - KEYCODE_BACK: Consumed when in pinned focus app so Back does not exit to Home.
-     * - KEYCODE_BACK: Passed through in allowed exception apps (Phone, GPay).
-     * - KEYCODE_HOME: Consumed and bounces back to pinned app.
+     * - KEYCODE_BACK: Allowed within pinned app and exception apps so internal navigation is smooth.
+     * - KEYCODE_HOME: Consumed and smoothly bounces back to pinned app.
      * - KEYCODE_APP_SWITCH: Consumed to block the recent apps task switcher.
      */
     override fun onKeyEvent(event: KeyEvent): Boolean {
@@ -215,21 +211,14 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
         when (keyCode) {
             KeyEvent.KEYCODE_BACK -> {
-                // 1. Inside pinned focus app: Consume back press so root activity does not exit
-                if (currentFg == pinnedPkg) {
-                    if (action == KeyEvent.ACTION_DOWN) {
-                        ExpressiveFeedbackEngine.playInterceptionRejected(applicationContext)
-                    }
-                    return true
-                }
-
-                // 2. Inside allowed exception app: Allow back so user can use the app
-                if (ChapterLockEnforcer.isFocusExceptionPackage(currentFg)) {
+                // Inside pinned focus app or allowed exception apps:
+                // Allow back events to pass through so internal navigation (menus, search, previous pages) works smoothly!
+                if (currentFg == pinnedPkg || ChapterLockEnforcer.isFocusExceptionPackage(currentFg)) {
                     return super.onKeyEvent(event)
                 }
 
-                // 3. Anywhere else: Consume and bounce back to pinned app
-                if (action == KeyEvent.ACTION_DOWN && pinnedPkg.isNotBlank()) {
+                // If user is anywhere else (e.g. attempting to navigate out): bounce back to pinned app
+                if (action == KeyEvent.ACTION_DOWN && pinnedPkg.isNotBlank() && currentFg != pinnedPkg) {
                     bounceBackToPinnedApp(pinnedPkg)
                 }
                 return true
@@ -245,6 +234,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             KeyEvent.KEYCODE_APP_SWITCH -> {
                 if (action == KeyEvent.ACTION_DOWN) {
                     ExpressiveFeedbackEngine.playInterceptionRejected(applicationContext)
+                    if (pinnedPkg.isNotBlank()) {
+                        bounceBackToPinnedApp(pinnedPkg)
+                    }
                 }
                 return true
             }
@@ -266,14 +258,22 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                 window.isInPictureInPictureMode
             } else false
 
+            // Critical optimization: ignore inactive, unfocused background windows (such as background launcher)
+            if (!isPip && !window.isActive && !window.isFocused) {
+                continue
+            }
+
             val rootNode = try { window.root } catch (_: Exception) { null }
             val pkg = rootNode?.packageName?.toString()?.takeIf { it.isNotBlank() } ?: continue
             if (pkg == packageName) continue
 
+            // Never intercept SystemUI, pinned focus app, or allowed focus exception apps
+            if (ChapterLockEnforcer.isPackageAllowedDuringFocus(pkg)) {
+                continue
+            }
+
             val decision = ChapterLockEnforcer.evaluatePackage(pkg, packageName)
             if (decision != null) {
-                Log.w(TAG, "Detected blocked window (PiP=$isPip) for package: $pkg")
-
                 // 1. Instantly mute audio & stop media playback
                 MediaPlaybackSuppressor.suppressPlayback(this, pkg)
 
@@ -324,14 +324,22 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         return false
     }
 
+    private var lastBounceBackTime = 0L
+
     private fun inspectAndEnforcePackage(packageName: String) {
         val myPackageName = applicationContext.packageName
         if (packageName == myPackageName) return
 
+        // Skip SystemUI (notification shade / quick settings) and keyboards
+        if (packageName == "com.android.systemui" || packageName.contains("inputmethod", ignoreCase = true)) {
+            return
+        }
+
         val decision = ChapterLockEnforcer.evaluatePackage(packageName, myPackageName) ?: return
 
         // 1. If user attempted to navigate to the Home screen launcher during Focus Lock:
-        // Execute an immediate zero-delay bounce back to the pinned focus app!
+        // Execute an immediate smooth bounce back to the pinned focus app!
+        // DO NOT show overlay barrier, DO NOT start MainActivity, DO NOT post full screen intent!
         if (decision.reason == InterceptReason.FOCUS_LOCK_LAUNCHER_BREACH) {
             val pinnedPkg = ChapterLockEnforcer.getPinnedFocusPackage()
             if (pinnedPkg.isNotBlank()) {
@@ -353,40 +361,48 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
         Log.w(TAG, "Intercepting package: $packageName for reason: ${decision.reason}")
 
-        // 3. Immediately display the System Window Overlay Barrier over the target app
-        LockWindowOverlayManager.showBarrier(
-            context = this,
-            decision = decision,
-            isFromAccessibilityService = true
-        )
+        // 3. Display the clean System Window Overlay Barrier if permission is granted
+        val canDrawOverlay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(this)
+        } else true
 
-        // 4. Also launch MainActivity Friction Shield directly
-        val intent = Intent(this, MainActivity::class.java).apply {
-            addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_NO_ANIMATION
+        if (canDrawOverlay) {
+            LockWindowOverlayManager.showBarrier(
+                context = this,
+                decision = decision,
+                isFromAccessibilityService = true
             )
-            putExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE, decision.packageName)
-            putExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON, decision.reason.name)
-        }
-
-        try {
-            startActivity(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Direct startActivity suppressed; overlay barrier active", e)
-        }
-
-        // 5. Post high-priority FullScreenIntent notification
-        try {
-            showInterceptNotification(decision.appName, decision.reason, intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to show intercept notification", e)
+        } else {
+            // Fallback: Launch MainActivity Friction Shield directly ONLY when overlay permission is missing
+            val intent = Intent(this, MainActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_NO_ANIMATION
+                )
+                putExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE, decision.packageName)
+                putExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON, decision.reason.name)
+            }
+            try {
+                startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to launch friction challenge activity, falling back to notification", e)
+                showInterceptNotification(decision.appName, decision.reason, intent)
+            }
         }
     }
 
     private fun bounceBackToPinnedApp(pinnedPackage: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastBounceBackTime < 800L) {
+            return
+        }
+        if (currentForegroundPackage == pinnedPackage) {
+            return
+        }
+        lastBounceBackTime = now
+
         val launchIntent = packageManager.getLaunchIntentForPackage(pinnedPackage)?.apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or

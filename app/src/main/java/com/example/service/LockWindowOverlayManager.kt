@@ -113,7 +113,6 @@ object LockWindowOverlayManager {
                     WindowManager.LayoutParams.MATCH_PARENT,
                     windowType,
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
                             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                     PixelFormat.TRANSLUCENT
