@@ -136,7 +136,7 @@ fun FrictionShieldOverlay(
                 .imePadding(),
             contentAlignment = Alignment.Center
         ) {
-            val isTablet = maxWidth >= 740.dp && maxWidth > maxHeight
+            val isTablet = minOf(maxWidth, maxHeight) >= 600.dp && maxWidth > maxHeight
 
             if (isTablet) {
                 // --- TABLET 2-PANE COGNITIVE GATE ---
@@ -159,6 +159,7 @@ fun FrictionShieldOverlay(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
                                 .padding(28.dp),
                             verticalArrangement = Arrangement.SpaceBetween,
                             horizontalAlignment = Alignment.Start

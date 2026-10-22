@@ -13,6 +13,7 @@ import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -25,6 +26,7 @@ import com.example.ui.theme.ExpressiveFeedbackEngine
  * Native system window overlay barrier (TYPE_APPLICATION_OVERLAY / TYPE_ACCESSIBILITY_OVERLAY).
  * Guarantees instant full-screen blocking over YouTube or unauthorized apps even when OEMs
  * (such as Xiaomi HyperOS, MIUI, OneUI, or Android 14+ BAL) suppress background startActivity().
+ * Automatically enforces Media & AudioFocus suppression to kill background video/audio playback.
  */
 object LockWindowOverlayManager {
 
@@ -36,6 +38,9 @@ object LockWindowOverlayManager {
 
     @Volatile
     private var activeWindowManager: WindowManager? = null
+
+    @Volatile
+    private var activeContext: Context? = null
 
     @Volatile
     private var currentBlockedPackage: String? = null
@@ -57,6 +62,9 @@ object LockWindowOverlayManager {
                     return@post
                 }
 
+                // 1. Immediately halt audio and video playback for the blocked app
+                MediaPlaybackSuppressor.suppressPlayback(context, decision.packageName)
+
                 if (activeOverlayView != null && currentBlockedPackage == decision.packageName) {
                     return@post
                 }
@@ -75,7 +83,7 @@ object LockWindowOverlayManager {
                     isFromAccessibilityService && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1 ->
                         WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
                     !canDrawAppOverlay -> {
-                        val fallbackIntent = Intent(context, com.example.MainActivity::class.java).apply {
+                        val fallbackIntent = Intent(context, MainActivity::class.java).apply {
                             addFlags(
                                 Intent.FLAG_ACTIVITY_NEW_TASK or
                                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
@@ -105,6 +113,8 @@ object LockWindowOverlayManager {
                     WindowManager.LayoutParams.MATCH_PARENT,
                     windowType,
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
                             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                     PixelFormat.TRANSLUCENT
                 ).apply {
@@ -119,6 +129,7 @@ object LockWindowOverlayManager {
                 wm.addView(view, layoutParams)
                 activeOverlayView = view
                 activeWindowManager = wm
+                activeContext = context.applicationContext
                 currentBlockedPackage = decision.packageName
                 ExpressiveFeedbackEngine.playInterceptionRejected(context)
                 Log.i(TAG, "Displayed system overlay barrier for ${decision.packageName}")
@@ -137,6 +148,7 @@ object LockWindowOverlayManager {
     private fun dismissInternal() {
         val view = activeOverlayView ?: return
         val wm = activeWindowManager
+        val ctx = activeContext
         try {
             wm?.removeViewImmediate(view)
         } catch (_: Exception) {
@@ -147,7 +159,11 @@ object LockWindowOverlayManager {
         } finally {
             activeOverlayView = null
             activeWindowManager = null
+            activeContext = null
             currentBlockedPackage = null
+            if (ctx != null && !MainActivity.isInForeground) {
+                MediaPlaybackSuppressor.releaseSuppression(ctx)
+            }
         }
     }
 
@@ -163,10 +179,43 @@ object LockWindowOverlayManager {
             ).toInt()
         }
 
-        val root = FrameLayout(context).apply {
+        // Custom root FrameLayout that intercepts physical Back key presses
+        // and guarantees redirection to the pinned focus app or home
+        val root = object : FrameLayout(context) {
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                    val pinnedPkg = ChapterLockEnforcer.getPinnedAppPackage()
+                    if (!pinnedPkg.isNullOrBlank()) {
+                        val launchIntent = context.packageManager.getLaunchIntentForPackage(pinnedPkg)?.apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                        }
+                        if (launchIntent != null) {
+                            try {
+                                context.startActivity(launchIntent)
+                                dismissInternal()
+                                return true
+                            } catch (_: Exception) {
+                            }
+                        }
+                    }
+                    val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    try {
+                        context.startActivity(homeIntent)
+                    } catch (_: Exception) {
+                    }
+                    dismissInternal()
+                    return true
+                }
+                return super.dispatchKeyEvent(event)
+            }
+        }.apply {
             setBackgroundColor(Color.parseColor("#120F17"))
             isClickable = true
             isFocusable = true
+            isFocusableInTouchMode = true
         }
 
         val card = LinearLayout(context).apply {
@@ -180,7 +229,9 @@ object LockWindowOverlayManager {
             setPadding(dp(28), dp(32), dp(28), dp(28))
         }
 
-        val badgeText = if (decision.reason == InterceptReason.FOCUS_LOCK_BREACH) {
+        val badgeText = if (decision.reason == InterceptReason.FOCUS_LOCK_BREACH ||
+            decision.reason == InterceptReason.FOCUS_LOCK_LAUNCHER_BREACH
+        ) {
             "FOCUS LOCK ACTIVE"
         } else {
             "DAILY LIMIT REACHED"
@@ -209,7 +260,9 @@ object LockWindowOverlayManager {
         )
 
         val pinnedName = ChapterLockEnforcer.getPinnedAppName().ifBlank { "your pinned app" }
-        val titleStr = if (decision.reason == InterceptReason.FOCUS_LOCK_BREACH) {
+        val titleStr = if (decision.reason == InterceptReason.FOCUS_LOCK_BREACH ||
+            decision.reason == InterceptReason.FOCUS_LOCK_LAUNCHER_BREACH
+        ) {
             "${decision.appName} is locked during Focus"
         } else {
             "${decision.appName} time limit exhausted"
@@ -232,8 +285,10 @@ object LockWindowOverlayManager {
             }
         )
 
-        val subtitleStr = if (decision.reason == InterceptReason.FOCUS_LOCK_BREACH) {
-            "You are currently locked into $pinnedName (${ChapterLockEnforcer.getFocusRemainingSeconds() / 60 + 1}m remaining). Switching to other apps is blocked."
+        val subtitleStr = if (decision.reason == InterceptReason.FOCUS_LOCK_BREACH ||
+            decision.reason == InterceptReason.FOCUS_LOCK_LAUNCHER_BREACH
+        ) {
+            "You are currently locked into $pinnedName (${ChapterLockEnforcer.getFocusRemainingSeconds() / 60 + 1}m remaining). Switching to other apps or the home screen is blocked."
         } else {
             "You have reached your daily screen time target for ${decision.appName}. Solve the hard cognitive puzzle only if you need a 10-minute override."
         }
@@ -256,7 +311,9 @@ object LockWindowOverlayManager {
         )
 
         // Primary Action Button: Return to Pinned App (or Go Home)
-        val primaryLabel = if (decision.reason == InterceptReason.FOCUS_LOCK_BREACH) {
+        val isFocusBreach = decision.reason == InterceptReason.FOCUS_LOCK_BREACH ||
+                decision.reason == InterceptReason.FOCUS_LOCK_LAUNCHER_BREACH
+        val primaryLabel = if (isFocusBreach) {
             "Return to $pinnedName"
         } else {
             "Keep ${decision.appName} Locked"
@@ -277,13 +334,14 @@ object LockWindowOverlayManager {
             setOnClickListener {
                 dismissInternal()
                 val pinnedPkg = ChapterLockEnforcer.getPinnedAppPackage()
-                if (decision.reason == InterceptReason.FOCUS_LOCK_BREACH && !pinnedPkg.isNullOrBlank()) {
+                if (isFocusBreach && !pinnedPkg.isNullOrBlank()) {
                     val launchPinned = context.packageManager.getLaunchIntentForPackage(pinnedPkg)?.apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     }
                     if (launchPinned != null) {
                         try {
                             context.startActivity(launchPinned)
+                            MediaPlaybackSuppressor.releaseSuppression(context)
                             return@setOnClickListener
                         } catch (_: Exception) {
                         }
@@ -297,6 +355,7 @@ object LockWindowOverlayManager {
                     context.startActivity(homeIntent)
                 } catch (_: Exception) {
                 }
+                MediaPlaybackSuppressor.releaseSuppression(context)
             }
         }
         card.addView(
@@ -311,7 +370,7 @@ object LockWindowOverlayManager {
 
         // Secondary Action Button: Open Hard Puzzle in LockIN
         val puzzleBtn = TextView(context).apply {
-            text = if (decision.reason == InterceptReason.FOCUS_LOCK_BREACH) {
+            text = if (isFocusBreach) {
                 "Quit Focus Early • Hard Puzzle"
             } else {
                 "Unlock 10m Pass • Hard Puzzle"

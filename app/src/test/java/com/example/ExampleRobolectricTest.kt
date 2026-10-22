@@ -38,6 +38,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,6 +53,18 @@ class ExampleRobolectricTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Before
+    fun setUp() {
+        ChapterLockEnforcer.updateFocusLockState(
+            active = false,
+            pinnedPackage = null,
+            pinnedName = "",
+            endTimeMs = 0L
+        )
+        ChapterLockEnforcer.syncRules(emptyList())
+        ChapterLockEnforcer.syncFocusExceptions(emptySet())
+    }
 
     @Test
     fun `read string from context`() {
@@ -141,6 +154,11 @@ class ExampleRobolectricTest {
         assertNotNull(youtubeDecision)
         assertEquals(InterceptReason.FOCUS_LOCK_BREACH, youtubeDecision?.reason)
 
+        // System launcher must trigger FOCUS_LOCK_LAUNCHER_BREACH when Focus Lock is active to confine navigation
+        val launcherDecision = ChapterLockEnforcer.evaluatePackage("com.miui.home", "com.example")
+        assertNotNull(launcherDecision)
+        assertEquals(InterceptReason.FOCUS_LOCK_LAUNCHER_BREACH, launcherDecision?.reason)
+
         // Built-in emergency dialer must always be permitted during Focus Lock
         val dialerDecision = ChapterLockEnforcer.evaluatePackage("com.google.android.dialer", "com.example")
         assertNull("Emergency / Phone dialer must always be permitted during Focus Lock", dialerDecision)
@@ -151,6 +169,12 @@ class ExampleRobolectricTest {
         val gpayDecision = ChapterLockEnforcer.evaluatePackage(gpayPkg, "com.example")
         assertNull("User-configured exception app (GPay) must be permitted during Focus Lock", gpayDecision)
         ChapterLockEnforcer.syncFocusExceptions(emptySet())
+        ChapterLockEnforcer.updateFocusLockState(
+            active = false,
+            pinnedPackage = null,
+            pinnedName = "",
+            endTimeMs = 0L
+        )
     }
 
     @Test

@@ -124,6 +124,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
+
         // Refresh foreground notification state (active only when Focus Lock countdown is running)
         LockNotificationManager.refreshForegroundNotification(applicationContext)
 
@@ -284,11 +295,11 @@ class MainActivity : ComponentActivity() {
     private fun checkAndHandleIntent(intent: Intent?, vm: ChapterLockViewModel) {
         if (intent == null) return
 
-        // 1. Check if launched from notification "Unlock (Puzzle)" during Focus Lock
+        // 1. Check if launched from notification "Quit Focus Lock (Hard Challenge)" during Focus Lock
         if (intent.getBooleanExtra(EXTRA_FORCE_EARLY_EXIT_CHALLENGE, false)) {
+            setIntent(Intent(intent).apply { removeExtra(EXTRA_FORCE_EARLY_EXIT_CHALLENGE) })
             vm.selectTab(AppTab.FOCUS_LOCK)
             vm.requestQuitFocusLockEarly()
-            intent.removeExtra(EXTRA_FORCE_EARLY_EXIT_CHALLENGE)
             return
         }
 
@@ -296,9 +307,12 @@ class MainActivity : ComponentActivity() {
         val interceptedPkg = intent.getStringExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE)
         val interceptReason = intent.getStringExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON)
         if (!interceptedPkg.isNullOrBlank()) {
+            com.example.service.MediaPlaybackSuppressor.suppressPlayback(this, interceptedPkg)
+            setIntent(Intent(intent).apply {
+                removeExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE)
+                removeExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON)
+            })
             vm.handleInterception(interceptedPkg, interceptReason ?: "INTERCEPTED")
-            intent.removeExtra(ChapterLockEnforcer.EXTRA_INTERCEPTED_PACKAGE)
-            intent.removeExtra(ChapterLockEnforcer.EXTRA_INTERCEPT_REASON)
             return
         }
 
@@ -333,7 +347,24 @@ fun ChapterLockRoot(
     val context = LocalContext.current
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
 
-    if (uiState.currentTab != AppTab.APP_LIMITS && uiState.activeChallenge == null) {
+    if (uiState.activeSession.isActive) {
+        BackHandler {
+            val pinnedPkg = uiState.activeSession.pinnedPackageName
+            if (pinnedPkg.isNotBlank()) {
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(pinnedPkg)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                }
+                if (launchIntent != null) {
+                    try {
+                        context.startActivity(launchIntent)
+                        (context as? android.app.Activity)?.finish()
+                        return@BackHandler
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
+    } else if (uiState.currentTab != AppTab.APP_LIMITS && uiState.activeChallenge == null) {
         BackHandler {
             viewModel.selectTab(AppTab.APP_LIMITS)
         }

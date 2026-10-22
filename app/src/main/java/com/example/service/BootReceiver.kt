@@ -38,6 +38,16 @@ class BootReceiver : BroadcastReceiver() {
                             endTimeMs = focusConfig.endTimeEpochMs
                         )
                         AppMonitorService.start(appContext)
+
+                        val launchIntent = appContext.packageManager.getLaunchIntentForPackage(focusConfig.pinnedPackageName)
+                        if (launchIntent != null) {
+                            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            try {
+                                appContext.startActivity(launchIntent)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to launch pinned app on boot", e)
+                            }
+                        }
                     } else {
                         LockNotificationManager.refreshForegroundNotification(appContext)
                     }

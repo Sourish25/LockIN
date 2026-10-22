@@ -135,9 +135,14 @@ object LockNotificationManager {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Action 3: Early Unlock (via Puzzle)
+            // Action 3: Early Unlock (via Hard Puzzle Challenge)
             val unlockIntent = Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                )
                 putExtra(EXTRA_FORCE_EARLY_EXIT_CHALLENGE, true)
             }
             val unlockPending = PendingIntent.getActivity(
@@ -150,9 +155,9 @@ object LockNotificationManager {
             val builder = NotificationCompat.Builder(context, CHANNEL_GUARD_ID)
                 .setSmallIcon(R.drawable.ic_stat_lockin)
                 .setContentTitle("Focus Lock: $pinnedAppName")
-                .setContentText("Pinned to $pinnedAppName (${formatMinutesClean(remainingMins)} left) • Other apps blocked")
+                .setContentText("Pinned to $pinnedAppName (${formatMinutesClean(remainingMins)} left)")
                 .setSubText("Focus Lock Active")
-                .setContentIntent(mainPending)
+                .setContentIntent(openPinnedPending)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setSilent(true)
@@ -162,7 +167,7 @@ object LockNotificationManager {
                 .setUsesChronometer(true)
                 .addAction(0, "Open $pinnedAppName", openPinnedPending)
                 .addAction(0, "+15m", extendPending)
-                .addAction(0, "Unlock (Puzzle)", unlockPending)
+                .addAction(0, "Quit Focus Lock (Hard Challenge)", unlockPending)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 builder.setChronometerCountDown(true)

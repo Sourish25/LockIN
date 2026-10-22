@@ -15,6 +15,7 @@ import com.example.data.PinnedFocusAppEntity
 import com.example.service.AppMonitorService
 import com.example.service.LockNotificationManager
 import com.example.service.LockWindowOverlayManager
+import com.example.service.MediaPlaybackSuppressor
 import com.example.updater.AppReleaseInfo
 import com.example.updater.UpdateState
 import java.io.File
@@ -448,6 +449,9 @@ class ChapterLockViewModel(
     }
 
     fun requestQuitFocusLockEarly() {
+        if (controlState.value.activeChallenge?.reason == FrictionReason.QUIT_FOCUS_LOCK_EARLY) {
+            return
+        }
         val session = uiState.value.activeSession
         openFrictionChallenge(
             reason = FrictionReason.QUIT_FOCUS_LOCK_EARLY,
@@ -684,6 +688,7 @@ class ChapterLockViewModel(
             state.copy(
                 activeChallenge = current.copy(
                     mode = mode,
+                    userClickedSequence = emptyList(),
                     mathErrorMessage = null
                 )
             )
@@ -697,9 +702,7 @@ class ChapterLockViewModel(
     fun updateChallengeTypedPhrase(input: String) {
         controlState.update { state ->
             val current = state.activeChallenge ?: return@update state
-            val delta = input.length - current.typedPhrase.length
-            val sanitized = if (delta > 6) current.typedPhrase else input
-            state.copy(activeChallenge = current.copy(typedPhrase = sanitized))
+            state.copy(activeChallenge = current.copy(typedPhrase = input))
         }
     }
 
@@ -804,23 +807,32 @@ class ChapterLockViewModel(
         val currentChallenge = controlState.value.activeChallenge
         controlState.update { it.copy(activeChallenge = null) }
 
-        if (context != null && currentChallenge?.wasTriggeredByInterception == true) {
-            if (currentChallenge.reason == FrictionReason.QUIT_FOCUS_LOCK_EARLY) {
+        if (context != null) {
+            val targetPkg = currentChallenge?.targetPackageName
+            if (targetPkg != null) {
+                MediaPlaybackSuppressor.suppressPlayback(context, targetPkg)
+            }
+
+            if (uiState.value.activeSession.isActive) {
                 val pinnedPkg = uiState.value.activeSession.pinnedPackageName
                 if (pinnedPkg.isNotBlank()) {
                     val launchPinned = repository.createLaunchIntent(pinnedPkg)
                     if (launchPinned != null) {
                         try {
                             context.startActivity(launchPinned)
-                            return
                         } catch (_: Exception) {
                         }
                     }
                 }
+                (context as? android.app.Activity)?.finish()
+                return
             }
-            try {
-                context.startActivity(repository.createHomeScreenIntent())
-            } catch (_: Exception) {
+
+            if (currentChallenge?.wasTriggeredByInterception == true) {
+                try {
+                    context.startActivity(repository.createHomeScreenIntent())
+                } catch (_: Exception) {
+                }
             }
         }
     }
