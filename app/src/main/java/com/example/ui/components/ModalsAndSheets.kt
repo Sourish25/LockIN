@@ -1139,7 +1139,7 @@ fun SystemPermissionsBottomSheet(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "System Shield Setup",
+                    text = "Protection & Permissions",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -1214,50 +1214,7 @@ fun SystemPermissionsBottomSheet(
                 )
             }
 
-            if (onCheckForUpdates != null) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(22.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = "LockIN v${BuildConfig.VERSION_NAME}",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "GitHub Releases channel",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
 
-                        FilledTonalButton(
-                            onClick = {
-                                onDismiss()
-                                onCheckForUpdates()
-                            },
-                            shape = CircleShape
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.SystemUpdate,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Updates", style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
-                }
-            }
 
             Button(
                 onClick = onDismiss,

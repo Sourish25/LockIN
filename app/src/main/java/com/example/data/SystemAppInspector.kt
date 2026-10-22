@@ -186,15 +186,24 @@ class SystemAppInspector(val context: Context) {
     }
 
     fun createBatteryOptimizationIntent(): Intent {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val directIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                 data = Uri.parse("package:${context.packageName}")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-        } else {
-            Intent(Settings.ACTION_SETTINGS).apply {
+            if (directIntent.resolveActivity(context.packageManager) != null) {
+                return directIntent
+            }
+            val listIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+            if (listIntent.resolveActivity(context.packageManager) != null) {
+                return listIntent
+            }
+            return createAppDetailsSettingsIntent()
+        }
+        return Intent(Settings.ACTION_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
     }
 

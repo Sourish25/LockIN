@@ -32,7 +32,8 @@ import kotlinx.coroutines.launch
 
 enum class AppTab {
     APP_LIMITS,
-    FOCUS_LOCK
+    FOCUS_LOCK,
+    SETTINGS
 }
 
 enum class ChallengeMode {

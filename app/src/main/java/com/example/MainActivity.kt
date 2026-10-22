@@ -34,13 +34,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -89,6 +92,7 @@ import com.example.ui.components.SelectFocusAppBottomSheet
 import com.example.ui.components.SelectFocusExceptionsBottomSheet
 import com.example.ui.components.SystemPermissionsBottomSheet
 import com.example.ui.screens.AppVaultScreen
+import com.example.ui.screens.ExpressiveSettingsScreen
 import com.example.ui.screens.ReadAndLockScreen
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LockInMotion
@@ -373,6 +377,10 @@ fun ChapterLockRoot(
                                 isTablet = isTablet,
                                 onOpenPermissionsSheet = onOpenPermissionsSheet,
                                 onCheckForUpdates = viewModel::checkForUpdates,
+                                onOpenSettings = { viewModel.selectTab(AppTab.SETTINGS) },
+                                onNavigateBack = if (uiState.currentTab == AppTab.SETTINGS) {
+                                    { viewModel.selectTab(AppTab.APP_LIMITS) }
+                                } else null,
                                 onToggleWallpaperTheme = onToggleWallpaperTheme
                             )
 
@@ -462,6 +470,32 @@ fun ChapterLockRoot(
                                                 }
                                             )
                                         }
+
+                                        AppTab.SETTINGS -> {
+                                            ExpressiveSettingsScreen(
+                                                hasUsageStatsPermission = uiState.hasUsageStatsPermission,
+                                                hasAccessibilityPermission = uiState.hasAccessibilityPermission,
+                                                hasOverlayPermission = uiState.hasOverlayPermission,
+                                                hasNotificationPermission = uiState.hasNotificationPermission,
+                                                isBatteryOptimizedExempt = uiState.isIgnoringBatteryOptimizations,
+                                                isXiaomiDevice = uiState.isXiaomiDevice,
+                                                focusExceptionApps = uiState.focusExceptionApps,
+                                                selectedDurationMinutes = uiState.activeSession.selectedDurationMinutes,
+                                                updateState = updateState,
+                                                isTablet = isTablet,
+                                                onNavigateBackToHome = { viewModel.selectTab(AppTab.APP_LIMITS) },
+                                                onOpenUsageAccessSettings = onLaunchUsageSettings,
+                                                onOpenAccessibilitySettings = onLaunchAccessibilitySettings,
+                                                onOpenOverlaySettings = onLaunchOverlaySettings,
+                                                onOpenAppDetailsSettings = onLaunchAppDetailsSettings,
+                                                onOpenNotificationSettings = onLaunchNotificationSettings,
+                                                onOpenBatteryOptimizationSettings = onLaunchBatteryOptimization,
+                                                onOpenXiaomiAutostartSettings = if (uiState.isXiaomiDevice) onLaunchXiaomiAutostart else null,
+                                                onOpenExceptionsSheet = { viewModel.setShowSelectFocusExceptionsSheet(true) },
+                                                onSelectDurationMinutes = viewModel::selectFocusDuration,
+                                                onCheckForUpdates = viewModel::checkForUpdates
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -469,7 +503,7 @@ fun ChapterLockRoot(
                     }
 
                     // Floating Pill Dock on Phone & Portrait Tablet
-                    if (!isTablet) {
+                    if (!isTablet && uiState.currentTab != AppTab.SETTINGS) {
                         FloatingExpressivePillDock(
                             currentTab = uiState.currentTab,
                             onSelectTab = viewModel::selectTab,
@@ -585,6 +619,8 @@ internal fun ExpressiveTopBar(
     isTablet: Boolean,
     onOpenPermissionsSheet: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onNavigateBack: (() -> Unit)? = null,
     onToggleWallpaperTheme: () -> Unit
 ) {
     Row(
@@ -598,74 +634,110 @@ internal fun ExpressiveTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AnimatedContent(
-            targetState = currentTab,
-            transitionSpec = {
-                LockInMotion.directionalTabTransition(
-                    movingForward = targetState.ordinal >= initialState.ordinal
-                )
-            },
-            label = "top_bar_title_transition"
-        ) { tab ->
-            Text(
-                text = when (tab) {
-                    AppTab.APP_LIMITS -> "App Limits"
-                    AppTab.FOCUS_LOCK -> "Focus Lock"
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (currentTab == AppTab.SETTINGS && onNavigateBack != null) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .expressiveClickable { onNavigateBack() }
+                        .testTag("top_bar_back_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            AnimatedContent(
+                targetState = currentTab,
+                transitionSpec = {
+                    LockInMotion.directionalTabTransition(
+                        movingForward = targetState.ordinal >= initialState.ordinal
+                    )
                 },
-                style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+                label = "top_bar_title_transition"
+            ) { tab ->
+                Text(
+                    text = when (tab) {
+                        AppTab.APP_LIMITS -> "App Limits"
+                        AppTab.FOCUS_LOCK -> "Focus Lock"
+                        AppTab.SETTINGS -> "Settings"
+                    },
+                    style = MaterialTheme.typography.displayMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isUpdateAvailable) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceContainerHigh
-                    )
-                    .expressiveClickable { onCheckForUpdates() }
-                    .testTag("check_updates_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.SystemUpdate,
-                    contentDescription = "Check for Updates",
-                    tint = if (isUpdateAvailable) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
+            // 1. In-App Update Button: ONLY visible when an update is actually available!
+            if (isUpdateAvailable) {
+                Box(
+                    modifier = Modifier
+                        .height(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .expressiveClickable { onCheckForUpdates() }
+                        .padding(horizontal = 14.dp)
+                        .testTag("check_updates_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.SystemUpdate,
+                            contentDescription = "Update Available",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Update",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
             }
 
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (!allPermissionsGranted) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceContainerHigh
+            // 2. Shield Setup Button: ONLY visible when essential permissions are missing!
+            if (!allPermissionsGranted) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .expressiveClickable { onOpenPermissionsSheet() }
+                        .testTag("open_permissions_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Shield,
+                        contentDescription = "Protection Setup Required",
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(20.dp)
                     )
-                    .expressiveClickable { onOpenPermissionsSheet() }
-                    .testTag("open_permissions_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (!allPermissionsGranted) Icons.Filled.Shield else Icons.Outlined.Shield,
-                    contentDescription = "System Permissions Settings",
-                    tint = if (!allPermissionsGranted) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(21.dp)
-                )
+                }
             }
 
+            // 3. Dynamic / Wallpaper Palette Toggle
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(44.dp)
                     .clip(ExpressiveSealShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .expressiveClickable { onToggleWallpaperTheme() }
@@ -677,8 +749,28 @@ internal fun ExpressiveTopBar(
                     contentDescription = "Switch Expressive / Wallpaper Palette",
                     tint = if (useDynamicWallpaper) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
+            }
+
+            // 4. Dedicated Settings Button (Hidden when already on Settings)
+            if (currentTab != AppTab.SETTINGS) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .expressiveClickable { onOpenSettings() }
+                        .testTag("open_settings_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
             }
         }
     }
@@ -849,6 +941,15 @@ internal fun ExpressiveNavigationRail(
                     unselectedIcon = Icons.Outlined.Lock,
                     onClick = { onSelectTab(AppTab.FOCUS_LOCK) },
                     modifier = Modifier.testTag("nav_tab_read_lock")
+                )
+
+                ExpressiveRailItem(
+                    label = "Settings",
+                    selected = currentTab == AppTab.SETTINGS,
+                    selectedIcon = Icons.Filled.Settings,
+                    unselectedIcon = Icons.Outlined.Settings,
+                    onClick = { onSelectTab(AppTab.SETTINGS) },
+                    modifier = Modifier.testTag("nav_tab_settings")
                 )
             }
 

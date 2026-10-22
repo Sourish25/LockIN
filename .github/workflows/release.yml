@@ -2,17 +2,18 @@ name: Publish Native GitHub Release (Multi-ABI APKs)
 
 on:
   push:
-    branches:
-      - main
-      - master
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag version (for example v1.1.0)'
+        description: 'Release tag version (for example v1.2.0)'
         required: true
-        default: 'v1.1.0'
+        default: 'v1.2.0'
+
+concurrency:
+  group: release-publish
+  cancel-in-progress: true
 
 permissions:
   contents: write
