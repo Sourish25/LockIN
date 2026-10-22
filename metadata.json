@@ -1,6 +1,0 @@
-{
-  "name": "LockIN",
-  "description": "Open source Android app blocker and reading focus lock built with Jetpack Compose and Material 3 Expressive. Enforces daily screen time limits and single-app reading sessions with multi-stage cognitive friction puzzles.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

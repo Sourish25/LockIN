@@ -71,7 +71,7 @@
             android:exported="false">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="App blocking and light novel reading focus guard" />
+                android:value="App blocking and single-task focus lock guard" />
         </service>
 
         <!-- Auto-restore service after device reboot or app updates -->

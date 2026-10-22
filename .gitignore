@@ -17,8 +17,8 @@ local.properties
 .env
 debug.keystore
 .build-outputs/
-.aistudio/
 /releases/
 /release-assets/
 *.jks
-
+.gemini/
+.agents/
