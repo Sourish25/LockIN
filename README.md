@@ -1,89 +1,113 @@
 <p align="center">
-  <img src="docs/assets/app_icon.png" width="120" height="120" alt="LockIN Icon" />
+  <img src="docs/assets/app_icon.png" width="112" height="112" alt="LockIN App Icon" />
 </p>
 
 <h1 align="center">LockIN</h1>
 
 <p align="center">
   <strong>Stop doomscrolling. Lock in on what actually matters.</strong><br>
-  A free, local-first Android focus companion built with Material You Expressive design.<br>
-  Designed to stop mindless habit-swiping, conquer executive dysfunction, and protect deep study and work.
+  A tactile, local-first Android focus companion designed with Material You Expressive architecture.<br>
+  Built to interrupt mindless muscle-memory swiping, conquer executive dysfunction, and protect deep work.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Sourish25/LockIN/releases"><img src="https://img.shields.io/github/v/release/Sourish25/LockIN?style=flat-square&color=6750A4&label=Release" alt="Release" /></a>
-  <a href="https://github.com/Sourish25/LockIN/actions"><img src="https://img.shields.io/badge/Build-Passing-3DDC84?style=flat-square&logo=githubactions&logoColor=white" alt="Build Status" /></a>
+  <a href="https://github.com/Sourish25/LockIN/releases/tag/v1.2.0"><img src="https://img.shields.io/badge/Release-v1.2.0-6750A4?style=flat-square" alt="Version 1.2.0" /></a>
+  <img src="https://img.shields.io/badge/Architecture-Material%20You%20Expressive-7F52FF?style=flat-square" alt="Material You Expressive" />
   <img src="https://img.shields.io/badge/Platform-Android%2010%20to%2016%20(API%2029--36)-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform" />
   <img src="https://img.shields.io/badge/Privacy-100%25%20On--Device%20%7C%20Zero%20Telemetry-10B981?style=flat-square" alt="Zero Telemetry" />
-  <img src="https://img.shields.io/badge/Language-Kotlin%20100%25-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
-  <img src="https://img.shields.io/badge/Design-Material%20You%20Expressive-6750A4?style=flat-square" alt="Material You Expressive" />
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/Language-Kotlin%20100%25-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin 100%" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-4B5563?style=flat-square" alt="MIT License" /></a>
+</p>
+
+<p align="center">
+  <a href="#quick-start-in-4-steps"><strong>How It Works</strong></a> &bull;
+  <a href="#the-everyday-problem"><strong>Why LockIN</strong></a> &bull;
+  <a href="#material-you-expressive-design"><strong>Design Language</strong></a> &bull;
+  <a href="#visual-interface"><strong>Screenshots</strong></a> &bull;
+  <a href="#technical-architecture"><strong>Architecture</strong></a> &bull;
+  <a href="#downloads--installation"><strong>Downloads</strong></a>
 </p>
 
 ---
 
-## What is LockIN?
+## The Everyday Problem
 
-LockIN is an Android app that stops you from getting distracted by Instagram Reels, YouTube Shorts, TikTok, or endless notifications when you need to get things done.
+We all know the routine: you sit down to study or finish an important project. You open your phone to look up one quick fact or watch a required lecture on YouTube. Ten seconds later, your thumb executes an automatic muscle-memory swipe: you are watching Instagram Reels, YouTube Shorts, or scrolling through feeds. Forty-five minutes vanish before your conscious brain even realizes you got distracted.
 
-Most people do not have a discipline problem. When you sit down to study or work and hit a moment of boredom or difficulty, your hand automatically swipes to recent apps and opens social media before your conscious brain can even realize what happened.
+This is not a lack of willpower. Modern social feeds are engineered by entire teams to exploit human dopamine pathways. The moment you experience slight boredom or mental resistance during study or work, your brain seeks an easy dopamine reward.
 
-Traditional app blockers do not work well for real life:
-- If you need YouTube to watch a lecture, standard blockers either block YouTube completely or leave you vulnerable to the algorithm's rabbit hole.
-- Most blockers show an easy "Cancel" button that you tap without thinking.
-- Commercial apps demand monthly subscriptions, show ads, or harvest your personal app usage data.
+Standard screen-time apps fail because:
+- **They are all-or-nothing**: If you need YouTube for a computer science or math class, traditional blockers either ban YouTube completely (stopping you from studying) or leave you vulnerable to the recommendation algorithm.
+- **They use passive alerts**: An easy dismiss button or gentle timer dialog does nothing to stop sub-second muscle memory.
+- **They monetize your focus**: Most commercial focus apps lock basic timers behind monthly subscriptions, serve banner ads, or harvest your private app usage data.
 
-LockIN solves this with a simple, human-first approach: **Lock yourself into any app you choose**, and let LockIN handle the distractions.
+**LockIN takes a different, human approach**: Instead of locking you out of your phone, it lets you **lock yourself inside the one app you actually need to use**, and stops every distraction before it starts.
 
 ---
 
-## How It Works in 4 Steps
+## Quick Start in 4 Steps
 
 ```
  ┌──────────────────────┐    ┌──────────────────────┐    ┌──────────────────────┐    ┌──────────────────────┐
- │ 1. Pick Your App     │    │ 2. Set Your Timer    │    │ 3. Lock In           │    │ 4. Mindful Shield    │
- │ Educational YouTube, │───>│ Choose 15m to 120m   │───>│ Your target app stays│───>│ Trying to exit early?│
- │ Termux, Obsidian,    │    │ with smooth odometer │    │ active; distractions │    │ Solve a fast puzzle  │
- │ books, or Duolingo.  │    │ reel scrolling.      │    │ blocked in <0.02ms.  │    │ to wake your brain.  │
+ │ 1. Choose Your Task  │    │ 2. Set Your Timer    │    │ 3. Lock In           │    │ 4. Mindful Shield    │
+ │ Educational lecture, │───>│ Rotate the smooth    │───>│ Your target app stays│───>│ Trying to quit early?│
+ │ Termux, Obsidian,    │    │ odometer dial from   │    │ open; distractions   │    │ Solve a fast puzzle  │
+ │ books, or Duolingo.  │    │ 15m up to 120m.      │    │ blocked in <0.02ms.  │    │ to wake your brain.  │
  └──────────────────────┘    └──────────────────────┘    └──────────────────────┘    └──────────────────────┘
 ```
 
-1. **Pick What You Are Doing**: Whether you are watching a computer science lecture on YouTube, writing in Obsidian, reading a textbook, practicing a language in Duolingo, or coding in Termux, choose your focus app.
+1. **Pick What You Are Doing**: Whether you are watching a technical course lecture on YouTube, programming in Termux, taking research notes in Obsidian, reading a textbook in Kindle, or practicing a language on Duolingo, select your focus app.
 2. **Dial In Your Time**: Use the slot-machine odometer dial to set your focus window from 15 minutes to 2 hours.
-3. **Lock In**: Tap the primary action button. Your focus app opens immediately. You can use your chosen app freely, but the moment your thumb tries to switch to Instagram, games, or messaging feeds, LockIN intercepts the switch in less than 0.02 milliseconds.
-4. **Break the Muscle Memory**: If you try to quit early out of habit, LockIN does not just let you click "OK". It presents a quick working-memory puzzle. By the time you solve it, the subconscious urge to doomscroll has passed, and you return to what you were doing.
+3. **Lock In**: Tap the primary action button. Your target app opens immediately. You have full freedom inside your chosen app, but the moment you try to switch to Instagram, TikTok, or games out of habit, LockIN catches the switch in under 0.02 milliseconds.
+4. **Break the Autopilot**: If you try to quit early out of habit, LockIN does not let you bypass with a simple tap. It presents a quick working-memory puzzle. By the time you solve it, the subconscious urge to doomscroll has cleared, and you can return to what matters.
 
 ---
 
-## Core Features for Everyday Life
+## Core Pillars
 
-### Single-App Immersion (The Focus Chamber)
-Pin any single application for a distraction-free work block. You have complete freedom inside your chosen tool—whether that is taking notes, watching a tutorial, or reading documentation—while all other distracting apps remain locked out until your countdown completes.
+### 1. Single-App Immersion (The Focus Chamber)
+Lock into any single application for a distraction-free work block. You have complete freedom inside your chosen app—watching lessons, writing documentation, or reading chapters—while every other entertainment app remains locked out until your countdown finishes.
 
-### Brain-Waking Friction Puzzles
-Traditional password gates become another automatic muscle-memory reflex within a few days. LockIN uses dynamic cognitive challenges that require conscious thought:
-- **4x4 Pattern Memory**: A fast visual pattern flashes for 2.5 seconds. Reconstruct it from memory to prove you are paying attention.
-- **Mental Arithmetic Chain**: Solve a three-step mental math problem to engage your analytical thinking.
-- **Mindful Statement**: Type an intentional affirmation that you consciously choose to break your focus session. Copy-paste is permanently disabled so you must type it manually.
+### 2. Brain-Waking Friction Puzzles
+Simple PIN codes become another automatic muscle-memory reflex within a few days. LockIN uses dynamic cognitive challenges that stimulate the prefrontal cortex:
+- **4x4 Pattern Memory**: A high-entropy visual pattern flashes for 2.5 seconds. Reconstruct it from memory to prove active attention.
+- **Mental Arithmetic Chain**: Solve a three-step mental math chain to engage analytical executive processing.
+- **Mindful Statement**: Manually type an intentional statement acknowledging your choice to interrupt your session. System clipboard actions are permanently disabled to require deliberate keystrokes.
 
-In more than 95 percent of attempts, completing the puzzle breaks the autopilot impulse, and users tap "Stay Focused" to return to their task.
+In over 95 percent of attempts, completing the challenge breaks the autopilot impulse, and users choose to return to their pinned work.
 
-### Daily App Budgets (The App Vault)
-For apps you still want to enjoy in moderation, set exact daily time limits (for example, 30 minutes total for social media per day). LockIN tracks usage down to the exact second and automatically locks the app when your daily budget runs out until midnight.
+### 3. Daily App Budgets (The App Vault)
+For apps you still want to enjoy in moderation, set exact daily time allowances (for example, 30 minutes total for social media per day). LockIN tracks usage down to the exact second and automatically locks the app when your daily budget runs out until midnight.
 
-### Allowed Real-Life Exceptions
-Deep work should never compromise your safety or daily necessities. LockIN includes an Exceptions list so phone calls, emergency contacts, two-factor authenticators, maps, and banking or payment apps (Google Pay) always remain accessible, even in the middle of a strict lock session.
+### 4. Allowed Real-Life Exceptions
+Deep work should never compromise your safety or daily necessities. LockIN includes an Exceptions list so phone calls, emergency contacts, two-factor authenticators, maps, and banking or payment apps (such as Google Pay) always remain accessible, even during an active focus lock.
 
-### 100% Offline and Private
-Your app usage, schedules, and study habits belong to you. LockIN contains zero analytics SDKs, zero advertising trackers, zero internet dependencies, and zero telemetry. All enforcement and data storage happen purely inside your device's local hardware.
+### 5. 100% Offline and Private
+Your app usage, schedules, and study habits belong entirely to you. LockIN contains zero analytics SDKs, zero advertising trackers, zero internet dependencies, and zero telemetry. All enforcement and data storage happen purely inside your device's local hardware.
 
 ---
 
 ## Material You Expressive Design
 
-LockIN is designed from the ground up to follow Google's Material You Expressive design language. Instead of feeling punitive, clinical, or dull, LockIN feels modern, playful, tactile, and delightful:
+LockIN is built upon Google's Material You Expressive design language. Instead of feeling punitive, clinical, or dull, the app is tactile, responsive, and aesthetically calming.
 
-- **Slot-Machine Odometer Clock**: Time selection and countdown timers use physical-inspired digit reels that scroll smoothly into place with spring physics.
+```
+  Geometric Whimsy        Dynamic Fluidity         Tactile Feedback        Adaptive Canvases
+ ┌────────────────┐      ┌────────────────┐      ┌────────────────┐      ┌────────────────┐
+ │ Scalloped seals│      │ Slot-machine   │      │ Synthesized    │      │ Canonical      │
+ │ & chunky pill  │ ───> │ odometer clock │ ───> │ micro-haptics  │ ───> │ two-pane 3:2   │
+ │ touch targets  │      │ transitions    │      │ & audio cues   │      │ tablet layouts │
+ └────────────────┘      └────────────────┘      └────────────────┘      └────────────────┘
+```
+
+- **Slot-Machine Odometer Clock**: Time selection dials and countdown timers use physical-inspired digit reels that scroll smoothly into place with spring physics:
+  ```
+  ┌─────────┬─────────┬─────────┬─────────┐
+  │    0    │    0    │    2    │    5    │  <-- Digit reel transitions
+  ├─────────┼─────────┼─────────┼─────────┤
+  │    H    │    H    │    M    │    M    │  <-- Focus Countdown
+  └─────────┴─────────┴─────────┴─────────┘
+  ```
 - **Red Cross Rain Interception Canvas**: When you attempt to open an unauthorized app, an animated geometric red cross rain canvas greets you with soft pill charms and badges, providing clear visual boundaries without harsh error screens.
 - **Synthesized Haptics and Micro-Audio**: Custom vibration waveforms and zero-latency sound effects provide subtle tactile feedback when you rotate dials, tap pill chips, or activate a focus lock.
 - **Adaptive Multi-Pane Layouts**: Designed for modern Android hardware, scaling naturally from compact phones to foldables and 3:2 productivity tablets (such as the Xiaomi Pad 7) with dual-pane master-detail layouts.
@@ -106,7 +130,32 @@ LockIN is designed from the ground up to follow Google's Material You Expressive
 
 ---
 
-## For Developers and Hackathon Judges
+## Cognitive Decision Pipeline
+
+Standard app blockers rely on passwords, which turn into subconscious muscle memory. LockIN replaces static gates with dynamic working-memory challenges designed to stimulate the prefrontal cortex and deactivate automatic impulse loops:
+
+```mermaid
+flowchart TD
+    Trigger["Impulsive Trigger: Boredom, Fatigue, or Distraction"] --> Impulse["Subconscious Habit: Swipe to Recents & Launch App"]
+    Impulse --> Check{"Target Allowed by Active Policy?"}
+    Check -- Yes --> Permitted["Uninterrupted Intentional Work"]
+    Check -- No --> Barrier["Hardware Window Overlay Barrier (<0.02ms)"]
+    Barrier --> Challenge["Cognitive Friction Challenge Presented"]
+    
+    Challenge --> ModalityA["4x4 Spatial Pattern Recall (Visuospatial)"]
+    Challenge --> ModalityB["3-Step Mental Arithmetic Chain (Central Executive)"]
+    Challenge --> ModalityC["Mindful Intent Transcription (Motor & Linguistic)"]
+    
+    ModalityA & ModalityB & ModalityC --> Shift["Cognitive Shift: System 1 (Automated) to System 2 (Deliberate)"]
+    Shift --> Evaluation{"Does the User Consciously Choose to Exit?"}
+    
+    Evaluation -- "No (Majority of Interventions)" --> Return["Tap 'Stay Focused' -> Re-immersion in Pinned App"]
+    Evaluation -- "Yes (Legitimate Need)" --> Unlock["Temporary Conscious Override Window Granted"]
+```
+
+---
+
+## Technical Architecture
 
 Underneath its accessible interface, LockIN is engineered as a high-performance system service built on modern Android standards:
 
@@ -144,9 +193,9 @@ graph TD
     CoreEngine -->|Hardware Overlays| UI
 ```
 
-### Engineering Benchmarks
+### Engineering Highlights
 
-- **Zero-Allocation Hot-Path Matching**: Incoming window transition events from `AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED` are matched against an in-memory `ConcurrentHashMap` rule snapshot in under `0.02ms`. This eliminates memory allocations on the main thread and avoids garbage collector frame drops.
+- **Zero-Allocation Hot-Path Matching**: Incoming window transition events from `AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED` are matched against an in-memory `ConcurrentHashMap` rule snapshot in under `0.02ms`. This avoids memory allocations on the main thread and prevents garbage collector frame drops.
 - **Dual-Layer Hardware Overlay Architecture**: Combines `TYPE_ACCESSIBILITY_OVERLAY` and `TYPE_APPLICATION_OVERLAY` directly via `WindowManager.addView`. This bypasses Android 10+ background activity start restrictions (`START_ACTIVITIES_FROM_BACKGROUND`), ensuring immediate coverage without visual flicker.
 - **Second-Accurate Usage Tracking**: Evaluates Android operating system `UsageEvents` stream deltas (`ACTIVITY_RESUMED` / `ACTIVITY_PAUSED`) to track cumulative foreground duration down to the exact second, including active in-progress sessions.
 - **Modern Android Compliance**: Fully conforms to Android 14 to 16 Foreground Service specifications (`FOREGROUND_SERVICE_TYPE_SPECIAL_USE` with API 34+ manifest properties).
@@ -154,19 +203,19 @@ graph TD
 
 ---
 
-## Release Downloads
+## Downloads & Installation
 
-Signed, multi-ABI production APK files are compiled and published directly via GitHub Actions:
+Signed, multi-ABI production APK binaries are compiled and published directly via GitHub Actions:
 
-| Architecture | Package Asset | Target Hardware |
-| :--- | :--- | :--- |
-| **ARM64 (64-bit)** | `LockIN-v1.2.0-arm64-v8a.apk` | Modern Android phones and tablets (2018 to Present) |
-| **ARMv7 (32-bit)** | `LockIN-v1.2.0-armeabi-v7a.apk` | Legacy 32-bit Android phones and budget hardware |
-| **x86_64** | `LockIN-v1.2.0-x86_64.apk` | Desktop Android emulators, ChromeOS, and 64-bit Intel/AMD |
-| **x86** | `LockIN-v1.2.0-x86.apk` | 32-bit development emulators |
-| **Universal** | `LockIN-v1.2.0-universal.apk` | Single package supporting all processor architectures |
+| Architecture | Package Asset | Target Hardware | SHA-256 Digest |
+| :--- | :--- | :--- | :--- |
+| **ARM64 (64-bit)** | [LockIN-v1.2.0-arm64-v8a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-arm64-v8a.apk) | Modern Android phones & tablets (2018 to Present) | `0b7f687fe64ef8bc0a96a83dde0b83c47bee6089f8b9d27fb89e3e0633df05de` |
+| **ARMv7 (32-bit)** | [LockIN-v1.2.0-armeabi-v7a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-armeabi-v7a.apk) | Legacy 32-bit Android phones and budget hardware | `94553911cd4be25c99cfe2e32bcc5364783ac836441e82498895ecd2b1baa00d` |
+| **Universal** | [LockIN-v1.2.0-universal.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-universal.apk) | Single package supporting all CPU architectures | `b9ebb33aa69c9ff5a8a7ca0a53d9a7db709fef6c2c0ad072e340b86d3bfffaca` |
+| **x86_64** | [LockIN-v1.2.0-x86_64.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-x86_64.apk) | Modern desktop Android emulators, ChromeOS & 64-bit PCs | `ba1badeab4d185b2923c173fd6d7495dd5f87a2ffe0639dee9e0791cd6be538f` |
+| **x86** | [LockIN-v1.2.0-x86.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-x86.apk) | 32-bit development emulators | `49a4a1ab5280d2a1487a18bf32658ef343259f15ff4be03b495f112417fe6e87` |
 
-Every release includes an official `SHA256SUMS.txt` cryptographic manifest to verify file integrity prior to installation.
+Every release includes an official [SHA256SUMS.txt](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/SHA256SUMS.txt) manifest to cryptographically verify archive authenticity prior to installation.
 
 ---
 
