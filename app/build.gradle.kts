@@ -15,6 +15,8 @@ android {
     versionCode = 2
     versionName = "1.2.0"
 
+    buildConfigField("long", "BUILD_TIME_MILLIS", "${System.currentTimeMillis()}L")
+
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 

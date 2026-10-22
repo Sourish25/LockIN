@@ -175,6 +175,63 @@ class AppUpdateManagerTest {
     }
 
     @Test
+    fun testParseReleaseJson_silentModeLeavesIdleWhenUpToDate() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val updateManager = AppUpdateManager(context)
+
+        val releaseJson = JSONObject("""
+            {
+                "tag_name": "v1.2.0",
+                "name": "LockIN Current Release",
+                "body": "Existing release payload.",
+                "published_at": "2020-01-01T00:00:00Z",
+                "assets": [
+                    {
+                        "id": 112233,
+                        "name": "LockIN-v1.2.0-arm64-v8a.apk",
+                        "size": 16000000,
+                        "updated_at": "2020-01-01T00:00:00Z",
+                        "browser_download_url": "https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-arm64-v8a.apk"
+                    }
+                ]
+            }
+        """.trimIndent())
+
+        val nowMs = AppUpdateManager.parseIso8601ToEpochMs("2026-10-22T21:00:00Z")
+        updateManager.parseReleaseJson(releaseJson, forceUpdate = false, localInstallTimeOverrideMs = nowMs, silent = true)
+        val state = updateManager.updateState.value
+        assertTrue("Silent check on up-to-date must leave state Idle", state is UpdateState.Idle)
+    }
+
+    @Test
+    fun testParseReleaseJson_silentModeSetsUpdateAvailableWhenRebuildDetected() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val updateManager = AppUpdateManager(context)
+
+        val releaseJson = JSONObject("""
+            {
+                "tag_name": "v1.2.0",
+                "name": "LockIN Rebuild Release",
+                "body": "Rebuild payload.",
+                "published_at": "2026-10-22T21:00:00Z",
+                "assets": [
+                    {
+                        "id": 889900,
+                        "name": "LockIN-v1.2.0-arm64-v8a.apk",
+                        "size": 16000000,
+                        "updated_at": "2026-10-22T22:00:00Z",
+                        "browser_download_url": "https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-arm64-v8a.apk"
+                    }
+                ]
+            }
+        """.trimIndent())
+
+        updateManager.parseReleaseJson(releaseJson, localInstallTimeOverrideMs = 1000L, silent = true)
+        val state = updateManager.updateState.value
+        assertTrue("Silent check on rebuild must set UpdateAvailable", state is UpdateState.UpdateAvailable)
+    }
+
+    @Test
     fun testCalculateSha256_computesExactDigest() {
         val tempFile = File.createTempFile("test_sha256", ".tmp")
         try {

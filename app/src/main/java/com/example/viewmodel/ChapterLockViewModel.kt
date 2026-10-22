@@ -244,12 +244,14 @@ class ChapterLockViewModel(
             repository.ensureSeededAndSynced()
             refreshPermissionsAndApps()
             startPeriodicTicker()
+            delay(1500L)
+            repository.updateManager.checkForUpdates(forceUpdate = false, silent = true)
         }
     }
 
-    fun checkForUpdates(forceUpdate: Boolean = false) {
+    fun checkForUpdates(forceUpdate: Boolean = false, silent: Boolean = false) {
         viewModelScope.launch {
-            repository.updateManager.checkForUpdates(forceUpdate = forceUpdate)
+            repository.updateManager.checkForUpdates(forceUpdate = forceUpdate, silent = silent)
         }
     }
 

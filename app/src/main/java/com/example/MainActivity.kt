@@ -407,7 +407,7 @@ fun ChapterLockRoot(
                                 useDynamicWallpaper = useDynamicWallpaper,
                                 isTablet = isTablet,
                                 onOpenPermissionsSheet = onOpenPermissionsSheet,
-                                onCheckForUpdates = viewModel::checkForUpdates,
+                                onCheckForUpdates = { viewModel.checkForUpdates(forceUpdate = true) },
                                 onOpenSettings = { viewModel.selectTab(AppTab.SETTINGS) },
                                 onNavigateBack = if (uiState.currentTab == AppTab.SETTINGS) {
                                     { viewModel.selectTab(AppTab.APP_LIMITS) }
@@ -524,7 +524,7 @@ fun ChapterLockRoot(
                                                 onOpenXiaomiAutostartSettings = if (uiState.isXiaomiDevice) onLaunchXiaomiAutostart else null,
                                                 onOpenExceptionsSheet = { viewModel.setShowSelectFocusExceptionsSheet(true) },
                                                 onSelectDurationMinutes = viewModel::selectFocusDuration,
-                                                onCheckForUpdates = viewModel::checkForUpdates,
+                                                onCheckForUpdates = { viewModel.checkForUpdates(forceUpdate = true) },
                                                 onDownloadRelease = viewModel::startUpdateDownload
                                             )
                                         }
@@ -608,7 +608,7 @@ fun ChapterLockRoot(
             onOpenNotifications = onLaunchNotificationSettings,
             onOpenBatteryOptimization = onLaunchBatteryOptimization,
             onOpenXiaomiAutostart = if (uiState.isXiaomiDevice) onLaunchXiaomiAutostart else null,
-            onCheckForUpdates = viewModel::checkForUpdates
+            onCheckForUpdates = { viewModel.checkForUpdates(forceUpdate = true) }
         )
 
         ExpressiveUpdateModalSheet(
@@ -622,7 +622,7 @@ fun ChapterLockRoot(
                 } catch (_: Exception) {
                 }
             },
-            onRetryCheck = viewModel::checkForUpdates
+            onRetryCheck = { viewModel.checkForUpdates(forceUpdate = true) }
         )
 
         // Full-Screen Hard Puzzle Gate

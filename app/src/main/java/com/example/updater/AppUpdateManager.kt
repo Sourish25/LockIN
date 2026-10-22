@@ -205,10 +205,41 @@ class AppUpdateManager(private val context: Context) {
             }
             return digest.digest().joinToString("") { "%02x".format(it) }
         }
+
+        fun getInstalledApkSha256(context: Context): String? {
+            return try {
+                val path = context.applicationInfo.sourceDir
+                if (path.isNullOrBlank()) return null
+                val apkFile = File(path)
+                if (apkFile.exists() && apkFile.canRead()) {
+                    calculateSha256(apkFile)
+                } else {
+                    null
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        fun getInstalledApkSize(context: Context): Long {
+            return try {
+                val path = context.applicationInfo.sourceDir
+                if (path.isNullOrBlank()) return 0L
+                File(path).length()
+            } catch (_: Exception) {
+                0L
+            }
+        }
     }
 
-    suspend fun checkForUpdates(customRepo: String? = null, forceUpdate: Boolean = false) {
-        _updateState.value = UpdateState.Checking
+    suspend fun checkForUpdates(
+        customRepo: String? = null,
+        forceUpdate: Boolean = false,
+        silent: Boolean = false
+    ) {
+        if (!silent) {
+            _updateState.value = UpdateState.Checking
+        }
         withContext(Dispatchers.IO) {
             try {
                 val repo = customRepo ?: DEFAULT_REPO
@@ -223,38 +254,47 @@ class AppUpdateManager(private val context: Context) {
 
                 val responseCode = connection.responseCode
                 if (responseCode == 403 || responseCode == 429) {
-                    val remaining = connection.getHeaderField("X-RateLimit-Remaining")
-                    val msg = if (remaining == "0") {
-                        "GitHub API rate limit reached. Please try again later."
-                    } else {
-                        "GitHub API request limit reached ($responseCode). Please try again later."
+                    if (!silent) {
+                        val remaining = connection.getHeaderField("X-RateLimit-Remaining")
+                        val msg = if (remaining == "0") {
+                            "GitHub API rate limit reached. Please try again later."
+                        } else {
+                            "GitHub API request limit reached ($responseCode). Please try again later."
+                        }
+                        _updateState.value = UpdateState.Error(msg)
                     }
-                    _updateState.value = UpdateState.Error(msg)
                     return@withContext
                 }
 
                 if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-                    // Try fetching all releases if latest is not tagged as latest
-                    fetchFirstAvailableRelease(repo, forceUpdate)
+                    fetchFirstAvailableRelease(repo, forceUpdate, silent = silent)
                     return@withContext
                 }
 
                 if (responseCode != HttpURLConnection.HTTP_OK) {
-                    _updateState.value = UpdateState.Error("Server returned code $responseCode")
+                    if (!silent) {
+                        _updateState.value = UpdateState.Error("Server returned code $responseCode")
+                    }
                     return@withContext
                 }
 
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
-                parseReleaseJson(JSONObject(responseText), forceUpdate)
+                parseReleaseJson(JSONObject(responseText), forceUpdate, silent = silent)
             } catch (e: Exception) {
-                _updateState.value = UpdateState.Error(
-                    e.localizedMessage ?: "Failed to check for updates. Check internet connection."
-                )
+                if (!silent) {
+                    _updateState.value = UpdateState.Error(
+                        e.localizedMessage ?: "Failed to check for updates. Check internet connection."
+                    )
+                }
             }
         }
     }
 
-    private suspend fun fetchFirstAvailableRelease(repo: String, forceUpdate: Boolean = false) {
+    private suspend fun fetchFirstAvailableRelease(
+        repo: String,
+        forceUpdate: Boolean = false,
+        silent: Boolean = false
+    ) {
         try {
             val url = URL("$GITHUB_API_URL/$repo/releases")
             val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -265,27 +305,34 @@ class AppUpdateManager(private val context: Context) {
                 setRequestProperty("User-Agent", "LockIN-Updater/${BuildConfig.VERSION_NAME}")
             }
             if (connection.responseCode == 403 || connection.responseCode == 429) {
-                _updateState.value = UpdateState.Error("GitHub API rate limit reached. Please try again later.")
+                if (!silent) {
+                    _updateState.value = UpdateState.Error("GitHub API rate limit reached. Please try again later.")
+                }
                 return
             }
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val releases = JSONArray(responseText)
                 if (releases.length() > 0) {
-                    parseReleaseJson(releases.getJSONObject(0), forceUpdate)
+                    parseReleaseJson(releases.getJSONObject(0), forceUpdate, silent = silent)
                     return
                 }
             }
-            _updateState.value = UpdateState.UpToDate()
+            if (!silent) {
+                _updateState.value = UpdateState.UpToDate()
+            }
         } catch (e: Exception) {
-            _updateState.value = UpdateState.Error("No releases found on GitHub: ${e.message}")
+            if (!silent) {
+                _updateState.value = UpdateState.Error("No releases found on GitHub: ${e.message}")
+            }
         }
     }
 
     fun parseReleaseJson(
         releaseObj: JSONObject,
         forceUpdate: Boolean = false,
-        localInstallTimeOverrideMs: Long? = null
+        localInstallTimeOverrideMs: Long? = null,
+        silent: Boolean = false
     ) {
         val tagName = releaseObj.optString("tag_name", "")
         val remoteVersion = tagName.trimStart('v')
@@ -297,9 +344,9 @@ class AppUpdateManager(private val context: Context) {
         val bestApk = resolveBestApkAsset(assetsList, Build.SUPPORTED_ABIS)
         if (bestApk == null) {
             if (isNewerVersion(currentVersion, remoteVersion)) {
-                _updateState.value = UpdateState.Error("No compatible APK found in release $tagName")
+                if (!silent) _updateState.value = UpdateState.Error("No compatible APK found in release $tagName")
             } else {
-                _updateState.value = UpdateState.UpToDate()
+                if (!silent) _updateState.value = UpdateState.UpToDate()
             }
             return
         }
@@ -318,19 +365,32 @@ class AppUpdateManager(private val context: Context) {
         val changelog = releaseObj.optString("body", "Bug fixes and performance improvements.")
         val publishedAt = releaseObj.optString("published_at", "")
 
+        val remoteDigest = apkAsset.optString("digest", "")
+        val remoteSha256 = if (remoteDigest.startsWith("sha256:", ignoreCase = true)) {
+            remoteDigest.substringAfter("sha256:").trim()
+        } else {
+            apkAsset.optString("sha256", "").ifBlank { null }
+        }
+
         val localInstallTimeMs = localInstallTimeOverrideMs ?: getLocalAppInstallTime(context)
         val lastSavedAssetId = prefs.getLong(KEY_LAST_INSTALLED_ASSET_ID, -1L)
 
         val isSemverNewer = isNewerVersion(currentVersion, remoteVersion)
         val isSameVersion = isSameOrEquivalentVersion(currentVersion, remoteVersion)
 
-        // Asset is considered a newer rebuild if:
-        // 1. Asset was updated after app installation (+5s grace to account for install duration)
-        // 2. OR asset ID differs from the last installed asset ID recorded by the in-app updater
-        val isAssetNewer = (assetUpdatedAtMs > 0L && localInstallTimeMs > 0L && assetUpdatedAtMs > (localInstallTimeMs + 5_000L)) ||
-            (assetId != 0L && lastSavedAssetId != -1L && assetId != lastSavedAssetId)
+        // 1. GitHub asset ID change compared to the last asset installed through the in-app updater
+        val isAssetIdDifferent = assetId != 0L && lastSavedAssetId != -1L && assetId != lastSavedAssetId
 
-        val isSameVersionRebuild = isSameVersion && isAssetNewer
+        // 2. Asset was uploaded to GitHub after this app was compiled (BUILD_TIME_MILLIS)
+        val isBuildTimeNewer = assetUpdatedAtMs > 0L &&
+                try { BuildConfig.BUILD_TIME_MILLIS > 0L && assetUpdatedAtMs > (BuildConfig.BUILD_TIME_MILLIS + 10_000L) } catch (_: Throwable) { false }
+
+        // 3. Asset was updated after installation time (+5s grace)
+        val isInstallTimeNewer = assetUpdatedAtMs > 0L && localInstallTimeMs > 0L &&
+                assetUpdatedAtMs > (localInstallTimeMs + 5_000L)
+
+        val isAssetNewer = isAssetIdDifferent || isBuildTimeNewer || isInstallTimeNewer
+        val isSameVersionRebuild = isSameVersion && (isAssetNewer || forceUpdate)
 
         val releaseInfo = AppReleaseInfo(
             tagName = tagName,
@@ -341,6 +401,7 @@ class AppUpdateManager(private val context: Context) {
             downloadUrl = downloadUrl,
             targetAbi = targetAbi,
             assetSize = assetSize,
+            sha256Checksum = remoteSha256,
             assetId = assetId,
             assetUpdatedAt = assetUpdatedAt,
             assetUpdatedAtMs = assetUpdatedAtMs,
@@ -352,7 +413,11 @@ class AppUpdateManager(private val context: Context) {
         } else if (isSameVersionRebuild || forceUpdate) {
             _updateState.value = UpdateState.UpdateAvailable(releaseInfo.copy(isSameVersionRebuild = true))
         } else {
-            _updateState.value = UpdateState.UpToDate(latestRelease = releaseInfo)
+            if (!silent) {
+                _updateState.value = UpdateState.UpToDate(latestRelease = releaseInfo)
+            } else {
+                _updateState.value = UpdateState.Idle
+            }
         }
     }
 
