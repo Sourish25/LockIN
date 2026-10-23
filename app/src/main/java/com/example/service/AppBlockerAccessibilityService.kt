@@ -200,7 +200,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
      * - KEYCODE_APP_SWITCH: Consumed to block the recent apps task switcher.
      */
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (!ChapterLockEnforcer.isFocusActive()) {
+        if (!ChapterLockEnforcer.isFocusActive() || MainActivity.isInForeground) {
             return super.onKeyEvent(event)
         }
 
@@ -208,6 +208,12 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         val action = event.action
         val currentFg = currentForegroundPackage.orEmpty()
         val pinnedPkg = ChapterLockEnforcer.getPinnedFocusPackage()
+        val myPkg = applicationContext.packageName
+
+        // Never intercept keys when user is actively inside LockIN
+        if (currentFg == myPkg) {
+            return super.onKeyEvent(event)
+        }
 
         when (keyCode) {
             KeyEvent.KEYCODE_BACK -> {
@@ -218,21 +224,21 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                 }
 
                 // If user is anywhere else (e.g. attempting to navigate out): bounce back to pinned app
-                if (action == KeyEvent.ACTION_DOWN && pinnedPkg.isNotBlank() && currentFg != pinnedPkg) {
+                if (action == KeyEvent.ACTION_DOWN && pinnedPkg.isNotBlank() && currentFg != pinnedPkg && currentFg != myPkg) {
                     bounceBackToPinnedApp(pinnedPkg)
                 }
                 return true
             }
 
             KeyEvent.KEYCODE_HOME -> {
-                if (action == KeyEvent.ACTION_DOWN && pinnedPkg.isNotBlank()) {
+                if (action == KeyEvent.ACTION_DOWN && pinnedPkg.isNotBlank() && currentFg != myPkg) {
                     bounceBackToPinnedApp(pinnedPkg)
                 }
                 return true
             }
 
             KeyEvent.KEYCODE_APP_SWITCH -> {
-                if (action == KeyEvent.ACTION_DOWN) {
+                if (action == KeyEvent.ACTION_DOWN && currentFg != myPkg) {
                     ExpressiveFeedbackEngine.playInterceptionRejected(applicationContext)
                     if (pinnedPkg.isNotBlank()) {
                         bounceBackToPinnedApp(pinnedPkg)
@@ -250,13 +256,25 @@ class AppBlockerAccessibilityService : AccessibilityService() {
      * split-screen panes, or floating freeform windows running blocked apps.
      */
     private fun inspectInteractiveWindows() {
+        if (MainActivity.isInForeground) return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return
         val windowList = try { windows } catch (_: Exception) { null } ?: return
+
+        val myPkg = applicationContext.packageName
+        val currentFg = currentForegroundPackage.orEmpty()
+        val isOurAppOrSettings = currentFg == myPkg ||
+                currentFg == "com.android.settings" ||
+                currentFg.contains("settings", ignoreCase = true)
 
         for (window in windowList) {
             val isPip = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 window.isInPictureInPictureMode
             } else false
+
+            // If user is inside our app or settings, ONLY inspect floating PiP windows to mute background video
+            if (isOurAppOrSettings && !isPip) {
+                continue
+            }
 
             // Critical optimization: ignore inactive, unfocused background windows (such as background launcher)
             if (!isPip && !window.isActive && !window.isFocused) {
@@ -265,15 +283,20 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
             val rootNode = try { window.root } catch (_: Exception) { null }
             val pkg = rootNode?.packageName?.toString()?.takeIf { it.isNotBlank() } ?: continue
-            if (pkg == packageName) continue
+            if (pkg == myPkg) continue
 
             // Never intercept SystemUI, pinned focus app, or allowed focus exception apps
             if (ChapterLockEnforcer.isPackageAllowedDuringFocus(pkg)) {
                 continue
             }
 
-            val decision = ChapterLockEnforcer.evaluatePackage(pkg, packageName)
+            val decision = ChapterLockEnforcer.evaluatePackage(pkg, myPkg)
             if (decision != null) {
+                // If this is a launcher breach but user is actually inside our app or settings, ignore it!
+                if (decision.reason == InterceptReason.FOCUS_LOCK_LAUNCHER_BREACH && isOurAppOrSettings) {
+                    continue
+                }
+
                 // 1. Instantly mute audio & stop media playback
                 MediaPlaybackSuppressor.suppressPlayback(this, pkg)
 
@@ -326,7 +349,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     private fun inspectAndEnforcePackage(packageName: String) {
         val myPackageName = applicationContext.packageName
-        if (packageName == myPackageName) return
+        if (packageName == myPackageName || MainActivity.isInForeground) return
 
         // Skip SystemUI (notification shade / quick settings) and keyboards
         if (packageName == "com.android.systemui" || packageName.contains("inputmethod", ignoreCase = true)) {
@@ -339,6 +362,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         // Execute an immediate smooth bounce back to the pinned focus app!
         // DO NOT show overlay barrier, DO NOT start MainActivity, DO NOT post full screen intent!
         if (decision.reason == InterceptReason.FOCUS_LOCK_LAUNCHER_BREACH) {
+            if (MainActivity.isInForeground) return
             val pinnedPkg = ChapterLockEnforcer.getPinnedFocusPackage()
             if (pinnedPkg.isNotBlank()) {
                 bounceBackToPinnedApp(pinnedPkg)
@@ -392,11 +416,13 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun bounceBackToPinnedApp(pinnedPackage: String) {
-        val now = System.currentTimeMillis()
-        if (now - lastBounceBackTime < 800L) {
+        if (MainActivity.isInForeground) return
+        val myPkg = applicationContext.packageName
+        if (currentForegroundPackage == myPkg || currentForegroundPackage == pinnedPackage) {
             return
         }
-        if (currentForegroundPackage == pinnedPackage) {
+        val now = System.currentTimeMillis()
+        if (now - lastBounceBackTime < 800L) {
             return
         }
         lastBounceBackTime = now

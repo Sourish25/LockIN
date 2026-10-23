@@ -48,21 +48,42 @@ class SystemAppInspector(val context: Context) {
         "com.sec.android.app.launcher"
     )
 
+    @Suppress("DEPRECATION")
     fun hasUsageStatsPermission(): Boolean {
-        return try {
+        try {
             val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager
-                ?: return false
-            val mode = appOps.checkOpNoThrow(
-                AppOpsManager.OPSTR_GET_USAGE_STATS,
-                Process.myUid(),
-                context.packageName
-            )
-            if (mode == AppOpsManager.MODE_DEFAULT) {
-                context.checkCallingOrSelfPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) ==
-                        PackageManager.PERMISSION_GRANTED
-            } else {
-                mode == AppOpsManager.MODE_ALLOWED
+            if (appOps != null) {
+                val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    appOps.unsafeCheckOpNoThrow(
+                        AppOpsManager.OPSTR_GET_USAGE_STATS,
+                        Process.myUid(),
+                        context.packageName
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    appOps.checkOpNoThrow(
+                        AppOpsManager.OPSTR_GET_USAGE_STATS,
+                        Process.myUid(),
+                        context.packageName
+                    )
+                }
+                if (mode == AppOpsManager.MODE_ALLOWED) {
+                    return true
+                }
             }
+        } catch (_: Exception) {
+        }
+
+        // Secondary check: query UsageStatsManager directly over recent activity
+        return try {
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+            val now = System.currentTimeMillis()
+            val stats = usm?.queryUsageStats(
+                UsageStatsManager.INTERVAL_DAILY,
+                now - 86_400_000L,
+                now
+            )
+            !stats.isNullOrEmpty()
         } catch (_: Exception) {
             false
         }
@@ -70,25 +91,36 @@ class SystemAppInspector(val context: Context) {
 
     fun hasAccessibilityPermission(): Boolean {
         if (AppBlockerAccessibilityService.isServiceConnected) return true
-        return try {
-            val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
-            val enabledList = am?.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-            if (enabledList?.any {
-                    it.resolveInfo?.serviceInfo?.packageName == context.packageName &&
-                            it.resolveInfo?.serviceInfo?.name?.contains(AppBlockerAccessibilityService::class.java.simpleName) == true
-                } == true
-            ) {
-                return true
+        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
+        if (am != null) {
+            try {
+                val enabledList = am.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                    ?: am.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_GENERIC)
+                if (enabledList?.any { info ->
+                        val id = info.id.orEmpty()
+                        val pkg = info.resolveInfo?.serviceInfo?.packageName.orEmpty()
+                        id.contains(context.packageName, ignoreCase = true) ||
+                                pkg == context.packageName ||
+                                id.contains("AppBlockerAccessibilityService", ignoreCase = true)
+                    } == true
+                ) {
+                    return true
+                }
+            } catch (_: Exception) {
             }
+        }
+
+        return try {
             val enabledServices = Settings.Secure.getString(
                 context.contentResolver,
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            ) ?: return false
-            val fullName = ComponentName(context, AppBlockerAccessibilityService::class.java).flattenToString()
-            val shortName = ComponentName(context, AppBlockerAccessibilityService::class.java).flattenToShortString()
-            enabledServices.contains(fullName, ignoreCase = true) ||
-                    enabledServices.contains(shortName, ignoreCase = true) ||
-                    enabledServices.contains(AppBlockerAccessibilityService::class.java.simpleName, ignoreCase = true)
+            )
+            if (!enabledServices.isNullOrBlank()) {
+                enabledServices.contains(context.packageName, ignoreCase = true) &&
+                        enabledServices.contains("AppBlockerAccessibilityService", ignoreCase = true)
+            } else {
+                false
+            }
         } catch (_: Exception) {
             false
         }

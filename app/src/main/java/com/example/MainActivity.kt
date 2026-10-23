@@ -348,18 +348,22 @@ fun ChapterLockRoot(
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
 
     if (uiState.activeSession.isActive) {
-        BackHandler {
-            val pinnedPkg = uiState.activeSession.pinnedPackageName
-            if (pinnedPkg.isNotBlank()) {
-                val launchIntent = context.packageManager.getLaunchIntentForPackage(pinnedPkg)?.apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                }
-                if (launchIntent != null) {
-                    try {
-                        context.startActivity(launchIntent)
-                        (context as? android.app.Activity)?.finish()
-                        return@BackHandler
-                    } catch (_: Exception) {
+        if (uiState.currentTab != AppTab.FOCUS_LOCK && uiState.activeChallenge == null) {
+            BackHandler {
+                viewModel.selectTab(AppTab.FOCUS_LOCK)
+            }
+        } else if (uiState.activeChallenge == null && !uiState.showPermissionsSheet && !uiState.showSelectFocusAppSheet && !uiState.showSelectFocusExceptionsSheet) {
+            BackHandler {
+                val pinnedPkg = uiState.activeSession.pinnedPackageName
+                if (pinnedPkg.isNotBlank()) {
+                    val launchIntent = context.packageManager.getLaunchIntentForPackage(pinnedPkg)?.apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    }
+                    if (launchIntent != null) {
+                        try {
+                            context.startActivity(launchIntent)
+                        } catch (_: Exception) {
+                        }
                     }
                 }
             }

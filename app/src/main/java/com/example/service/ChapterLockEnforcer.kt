@@ -199,6 +199,11 @@ object ChapterLockEnforcer {
                     return null
                 }
 
+                // If user is accessing System Settings temporarily to configure permissions: ALLOWED
+                if (settingsPackages.contains(cleanPkg) && now < settingsAllowedUntilMs.get()) {
+                    return null
+                }
+
                 // If user tried to go to the Home Launcher: BREACH! (Triggers instant bounce-back)
                 if (isLauncherPackage(cleanPkg)) {
                     return InterceptDecision(

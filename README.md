@@ -116,17 +116,35 @@ LockIN is built upon Google's Material You Expressive design language. Instead o
 
 ## Visual Interface
 
-### Mobile Smartphone Experience
+### Mobile Smartphone Experience (Portrait)
 
-| Daily App Vault | Focus Chamber | Cognitive Friction Shield |
+| Daily App Vault | Focus Chamber | Expressive Settings |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/app_limits_phone.png" width="250" alt="Daily App Limits Screen" /> | <img src="docs/screenshots/focus_lock_phone.png" width="250" alt="Focus Lock Screen" /> | <img src="docs/screenshots/friction_puzzle_phone.png" width="250" alt="Cognitive Friction Puzzle Screen" /> |
+| <img src="docs/screenshots/app_limits_phone.png" width="250" alt="Daily App Limits Screen" /> | <img src="docs/screenshots/focus_lock_phone.png" width="250" alt="Focus Lock Screen" /> | <img src="docs/screenshots/settings_screen_phone.png" width="250" alt="Expressive Settings Screen" /> |
 
-### Adaptive Tablet & Foldable Experience (3:2 Layout)
+### Cognitive Friction Challenges (Breaking Subconscious Muscle Memory)
 
-| Tablet Daily Quotas Layout | Tablet Focus Chamber Layout |
+| 4x4 Spatial Pattern Memory | 3-Step Mental Arithmetic Chain |
 | :---: | :---: |
-| <img src="docs/screenshots/tablet_app_limits_layout.png" width="420" alt="Tablet Daily App Limits Layout" /> | <img src="docs/screenshots/tablet_3_2_layout.png" width="420" alt="Tablet Focus Lock Layout" /> |
+| <img src="docs/screenshots/friction_puzzle_phone.png" width="320" alt="Cognitive Friction Memory Grid" /> | <img src="docs/screenshots/friction_math_phone.png" width="320" alt="Cognitive Friction Math Challenge" /> |
+
+### Intuitive Modal Sheets & App Selection
+
+| Pinned Focus App Selector | Protection & System Permissions |
+| :---: | :---: |
+| <img src="docs/screenshots/select_focus_app_sheet.png" width="320" alt="Select Focus App Sheet" /> | <img src="docs/screenshots/permissions_sheet_phone.png" width="320" alt="Protection & Permissions Sheet" /> |
+
+### Phone Landscape View (Media, Gaming & Study Form-Factors)
+
+| Focus Chamber (Landscape) | Daily App Vault (Landscape) |
+| :---: | :---: |
+| <img src="docs/screenshots/phone_landscape_focus_lock.png" width="420" alt="Phone Landscape Focus Lock" /> | <img src="docs/screenshots/phone_landscape_app_limits.png" width="420" alt="Phone Landscape App Limits" /> |
+
+### Adaptive Tablet & Foldable Experience (3:2 Canonical Layouts)
+
+| Portrait Tablet Focus View | Landscape 3:2 Focus Chamber | Landscape 3:2 App Quotas Vault |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/portrait_tablet_focus_lock.png" width="270" alt="Tablet Portrait Focus Lock" /> | <img src="docs/screenshots/tablet_3_2_layout.png" width="270" alt="Tablet Landscape Focus Lock" /> | <img src="docs/screenshots/tablet_app_limits_layout.png" width="270" alt="Tablet Landscape App Limits" /> |
 
 ---
 
@@ -209,11 +227,11 @@ Signed, multi-ABI production APK binaries are compiled and published directly vi
 
 | Architecture | Package Asset | Target Hardware | SHA-256 Digest |
 | :--- | :--- | :--- | :--- |
-| **ARM64 (64-bit)** | [LockIN-v1.2.0-arm64-v8a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-arm64-v8a.apk) | Modern Android phones & tablets (2018 to Present) | `0b7f687fe64ef8bc0a96a83dde0b83c47bee6089f8b9d27fb89e3e0633df05de` |
-| **ARMv7 (32-bit)** | [LockIN-v1.2.0-armeabi-v7a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-armeabi-v7a.apk) | Legacy 32-bit Android phones and budget hardware | `94553911cd4be25c99cfe2e32bcc5364783ac836441e82498895ecd2b1baa00d` |
-| **Universal** | [LockIN-v1.2.0-universal.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-universal.apk) | Single package supporting all CPU architectures | `b9ebb33aa69c9ff5a8a7ca0a53d9a7db709fef6c2c0ad072e340b86d3bfffaca` |
-| **x86_64** | [LockIN-v1.2.0-x86_64.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-x86_64.apk) | Modern desktop Android emulators, ChromeOS & 64-bit PCs | `ba1badeab4d185b2923c173fd6d7495dd5f87a2ffe0639dee9e0791cd6be538f` |
-| **x86** | [LockIN-v1.2.0-x86.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-x86.apk) | 32-bit development emulators | `49a4a1ab5280d2a1487a18bf32658ef343259f15ff4be03b495f112417fe6e87` |
+| **ARM64 (64-bit)** | [LockIN-v1.2.0-arm64-v8a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-arm64-v8a.apk) | Modern Android phones & tablets (2018 to Present) | `8e8e50c1c90494bb95fa67008f42252539857737a9a5d90c10f97edc0a9d9f84` |
+| **ARMv7 (32-bit)** | [LockIN-v1.2.0-armeabi-v7a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-armeabi-v7a.apk) | Legacy 32-bit Android phones and budget hardware | `eea261360257c728422e7a7abd29c168c4ae783d69ccb8c311d601c1fdc4fc18` |
+| **Universal** | [LockIN-v1.2.0-universal.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-universal.apk) | Single package supporting all CPU architectures | `0deadc806a1524f8aef532174cd8ea3694cc3318cd84be00f5d822fc68578688` |
+| **x86_64** | [LockIN-v1.2.0-x86_64.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-x86_64.apk) | Modern desktop Android emulators, ChromeOS & 64-bit PCs | `6e27253fa509e464d660da788186f9b8339cb2502115f747aed9d03026da46f5` |
+| **x86** | [LockIN-v1.2.0-x86.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-x86.apk) | 32-bit development emulators | `6b5977c9c1c98815960f83d23abac059915203e987391a2c0f3e2730919a1aea` |
 
 Every release includes an official [SHA256SUMS.txt](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/SHA256SUMS.txt) manifest to cryptographically verify archive authenticity prior to installation.
 

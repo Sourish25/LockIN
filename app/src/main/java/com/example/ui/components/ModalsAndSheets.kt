@@ -674,18 +674,15 @@ fun AddAppTimerBottomSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SelectFocusAppBottomSheet(
-    isVisible: Boolean,
+fun SelectFocusAppSheetContent(
     pinnedFocusApps: List<PinnedFocusAppEntity>,
     discoveredApps: List<DiscoveredDeviceApp>,
     onDismiss: () -> Unit,
     onSelectFocusApp: (String) -> Unit,
-    onAddCustomFocusApp: (packageName: String, appName: String, subtitle: String) -> Unit
+    onAddCustomFocusApp: (packageName: String, appName: String, subtitle: String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    if (!isVisible) return
-
     val context = LocalContext.current
     val scrollIsolation = rememberSheetScrollIsolationConnection()
     var searchQuery by remember { mutableStateOf("") }
@@ -714,6 +711,151 @@ fun SelectFocusAppBottomSheet(
         }
     }
 
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .nestedScroll(scrollIsolation)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { change, _ -> change.consume() }
+            }
+            .padding(horizontal = 24.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "Select Pinned Focus App",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "During Focus Lock, only this app (plus your Allowed Exception Apps) can stay open in the foreground.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Search installed apps...") },
+            leadingIcon = {
+                Icon(imageVector = Icons.Filled.Search, contentDescription = null)
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(imageVector = Icons.Filled.Clear, contentDescription = "Clear")
+                    }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(20.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(290.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .nestedScroll(scrollIsolation),
+            contentPadding = PaddingValues(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(allFocusCandidates, key = { it.packageName }) { app ->
+                Surface(
+                    color = if (app.isSelected) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .expressiveClickable {
+                            ExpressiveFeedbackEngine.playPillTap(context)
+                            if (pinnedFocusApps.any { it.packageName == app.packageName }) {
+                                onSelectFocusApp(app.packageName)
+                            } else {
+                                onAddCustomFocusApp(app.packageName, app.appName, app.subtitle)
+                            }
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                            ) {
+                                RealAppIcon(
+                                    packageName = app.packageName,
+                                    appName = app.appName,
+                                    modifier = Modifier.size(46.dp)
+                                )
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = app.appName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (app.isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = app.subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (app.isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        if (app.isSelected) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SelectFocusAppBottomSheet(
+    isVisible: Boolean,
+    pinnedFocusApps: List<PinnedFocusAppEntity>,
+    discoveredApps: List<DiscoveredDeviceApp>,
+    onDismiss: () -> Unit,
+    onSelectFocusApp: (String) -> Unit,
+    onAddCustomFocusApp: (packageName: String, appName: String, subtitle: String) -> Unit
+) {
+    if (!isVisible) return
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetMaxWidth = 600.dp,
@@ -721,137 +863,13 @@ fun SelectFocusAppBottomSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .nestedScroll(scrollIsolation)
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures { change, _ -> change.consume() }
-                }
-                .padding(horizontal = 24.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Select Pinned Focus App",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "During Focus Lock, only this app (plus your Allowed Exception Apps) can stay open in the foreground.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search installed apps...") },
-                leadingIcon = {
-                    Icon(imageVector = Icons.Filled.Search, contentDescription = null)
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(imageVector = Icons.Filled.Clear, contentDescription = "Clear")
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(20.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(290.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .nestedScroll(scrollIsolation),
-                contentPadding = PaddingValues(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(allFocusCandidates, key = { it.packageName }) { app ->
-                    Surface(
-                        color = if (app.isSelected) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceContainerLow,
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .expressiveClickable {
-                                ExpressiveFeedbackEngine.playPillTap(context)
-                                if (pinnedFocusApps.any { it.packageName == app.packageName }) {
-                                    onSelectFocusApp(app.packageName)
-                                } else {
-                                    onAddCustomFocusApp(app.packageName, app.appName, app.subtitle)
-                                }
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(46.dp)
-                                        .clip(RoundedCornerShape(14.dp))
-                                ) {
-                                    RealAppIcon(
-                                        packageName = app.packageName,
-                                        appName = app.appName,
-                                        modifier = Modifier.size(46.dp)
-                                    )
-                                }
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = app.appName,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = if (app.isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                        else MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = app.subtitle,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (app.isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            if (app.isSelected) {
-                                Icon(
-                                    imageVector = Icons.Filled.Check,
-                                    contentDescription = "Selected",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-        }
+        SelectFocusAppSheetContent(
+            pinnedFocusApps = pinnedFocusApps,
+            discoveredApps = discoveredApps,
+            onDismiss = onDismiss,
+            onSelectFocusApp = onSelectFocusApp,
+            onAddCustomFocusApp = onAddCustomFocusApp
+        )
     }
 }
 
@@ -1098,6 +1116,138 @@ fun SelectFocusExceptionsBottomSheet(
     }
 }
 
+@Composable
+fun SystemPermissionsSheetContent(
+    hasUsageAccess: Boolean,
+    hasAccessibility: Boolean,
+    hasOverlay: Boolean,
+    hasNotifications: Boolean = true,
+    isBatteryOptimizedExempt: Boolean,
+    isXiaomi: Boolean,
+    onDismiss: () -> Unit,
+    onOpenUsageAccess: () -> Unit,
+    onOpenAccessibility: () -> Unit,
+    onOpenOverlay: () -> Unit,
+    onOpenAppDetailsSettings: (() -> Unit)? = null,
+    onOpenNotifications: (() -> Unit)? = null,
+    onOpenBatteryOptimization: () -> Unit,
+    onOpenXiaomiAutostart: (() -> Unit)?,
+    onCheckForUpdates: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val scrollIsolation = rememberSheetScrollIsolationConnection()
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .nestedScroll(scrollIsolation)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "Protection & Permissions",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Grant these Android permissions to ensure LockIN stays active in the background, sends timer alerts, and intercepts apps immediately.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Android 13-16 Restricted Settings / Play Protect Sideload Unlock Helper
+        if ((!hasAccessibility || !hasOverlay) && onOpenAppDetailsSettings != null) {
+            PermissionRowCard(
+                title = "Unlock 'Restricted Settings' (Android 13+)",
+                subtitle = "If Accessibility is greyed out: tap App Info -> top-right ⋮ menu -> Allow restricted settings",
+                isGranted = false,
+                onGrantClick = onOpenAppDetailsSettings,
+                buttonLabel = "App Info"
+            )
+        }
+
+        // 1. Accessibility Blocker
+        PermissionRowCard(
+            title = "Accessibility Blocker",
+            subtitle = if (hasAccessibility) {
+                "Interception engine connected and active (<0.02ms event-driven)"
+            } else {
+                "Interception engine. If already toggled on in settings, turn OFF and back ON once to reconnect after app update."
+            },
+            isGranted = hasAccessibility,
+            onGrantClick = onOpenAccessibility
+        )
+
+        // 2. Usage Stats
+        PermissionRowCard(
+            title = "Usage Access",
+            subtitle = if (hasUsageAccess) {
+                "Live screen time tracking active"
+            } else {
+                "Calculates live daily app screen time minutes"
+            },
+            isGranted = hasUsageAccess,
+            onGrantClick = onOpenUsageAccess
+        )
+
+        // 3. Draw Over Other Apps
+        PermissionRowCard(
+            title = "Display Over Other Apps",
+            subtitle = "Renders instant LockIN barrier over blocked apps",
+            isGranted = hasOverlay,
+            onGrantClick = onOpenOverlay
+        )
+
+        // 4. Notifications (Live Focus Timer & 5m Warnings)
+        if (onOpenNotifications != null) {
+            PermissionRowCard(
+                title = "Timer & Limit Notifications",
+                subtitle = "Live Focus Lock chronometer & 5m remaining alerts",
+                isGranted = hasNotifications,
+                onGrantClick = onOpenNotifications
+            )
+        }
+
+        // 5. Battery Saver Exemption
+        PermissionRowCard(
+            title = "Unrestricted Battery",
+            subtitle = "Prevents OS from killing background monitoring",
+            isGranted = isBatteryOptimizedExempt,
+            onGrantClick = onOpenBatteryOptimization
+        )
+
+        // 6. Xiaomi Autostart (if device is Xiaomi / Redmi / POCO)
+        if (isXiaomi && onOpenXiaomiAutostart != null) {
+            PermissionRowCard(
+                title = "HyperOS / MIUI Autostart",
+                subtitle = "Allows LockIN to auto-resume on Xiaomi devices",
+                isGranted = false,
+                onGrantClick = onOpenXiaomiAutostart,
+                buttonLabel = "Configure"
+            )
+        }
+
+        Button(
+            onClick = onDismiss,
+            shape = CircleShape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+        ) {
+            Text(
+                text = "Close",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SystemPermissionsBottomSheet(
@@ -1120,8 +1270,6 @@ fun SystemPermissionsBottomSheet(
 ) {
     if (!isVisible) return
 
-    val scrollIsolation = rememberSheetScrollIsolationConnection()
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetMaxWidth = 600.dp,
@@ -1129,109 +1277,23 @@ fun SystemPermissionsBottomSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .nestedScroll(scrollIsolation)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Protection & Permissions",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Grant these Android permissions to ensure LockIN stays active in the background, sends timer alerts, and intercepts apps immediately.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Android 13-16 Restricted Settings / Play Protect Sideload Unlock Helper
-            if ((!hasAccessibility || !hasOverlay) && onOpenAppDetailsSettings != null) {
-                PermissionRowCard(
-                    title = "Unlock 'Restricted Settings' (Android 13+)",
-                    subtitle = "If Accessibility is greyed out: tap App Info -> top-right ⋮ menu -> Allow restricted settings",
-                    isGranted = false,
-                    onGrantClick = onOpenAppDetailsSettings,
-                    buttonLabel = "App Info"
-                )
-            }
-
-            // 1. Accessibility Blocker
-            PermissionRowCard(
-                title = "Accessibility Blocker",
-                subtitle = "Interception engine (<0.02ms event-driven)",
-                isGranted = hasAccessibility,
-                onGrantClick = onOpenAccessibility
-            )
-
-            // 2. Usage Stats
-            PermissionRowCard(
-                title = "Usage Access",
-                subtitle = "Calculates live daily app screen time minutes",
-                isGranted = hasUsageAccess,
-                onGrantClick = onOpenUsageAccess
-            )
-
-            // 3. Draw Over Other Apps
-            PermissionRowCard(
-                title = "Display Over Other Apps",
-                subtitle = "Renders instant LockIN barrier over blocked apps",
-                isGranted = hasOverlay,
-                onGrantClick = onOpenOverlay
-            )
-
-            // 4. Notifications (Live Focus Timer & 5m Warnings)
-            if (onOpenNotifications != null) {
-                PermissionRowCard(
-                    title = "Timer & Limit Notifications",
-                    subtitle = "Live Focus Lock chronometer & 5m remaining alerts",
-                    isGranted = hasNotifications,
-                    onGrantClick = onOpenNotifications
-                )
-            }
-
-            // 5. Battery Saver Exemption
-            PermissionRowCard(
-                title = "Unrestricted Battery",
-                subtitle = "Prevents OS from killing background monitoring",
-                isGranted = isBatteryOptimizedExempt,
-                onGrantClick = onOpenBatteryOptimization
-            )
-
-            // 6. Xiaomi Autostart (if device is Xiaomi / Redmi / POCO)
-            if (isXiaomi && onOpenXiaomiAutostart != null) {
-                PermissionRowCard(
-                    title = "HyperOS / MIUI Autostart",
-                    subtitle = "Allows LockIN to auto-resume on Xiaomi devices",
-                    isGranted = false,
-                    onGrantClick = onOpenXiaomiAutostart,
-                    buttonLabel = "Configure"
-                )
-            }
-
-
-
-            Button(
-                onClick = onDismiss,
-                shape = CircleShape,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-            ) {
-                Text(
-                    text = "Close",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-        }
+        SystemPermissionsSheetContent(
+            hasUsageAccess = hasUsageAccess,
+            hasAccessibility = hasAccessibility,
+            hasOverlay = hasOverlay,
+            hasNotifications = hasNotifications,
+            isBatteryOptimizedExempt = isBatteryOptimizedExempt,
+            isXiaomi = isXiaomi,
+            onDismiss = onDismiss,
+            onOpenUsageAccess = onOpenUsageAccess,
+            onOpenAccessibility = onOpenAccessibility,
+            onOpenOverlay = onOpenOverlay,
+            onOpenAppDetailsSettings = onOpenAppDetailsSettings,
+            onOpenNotifications = onOpenNotifications,
+            onOpenBatteryOptimization = onOpenBatteryOptimization,
+            onOpenXiaomiAutostart = onOpenXiaomiAutostart,
+            onCheckForUpdates = onCheckForUpdates
+        )
     }
 }
 

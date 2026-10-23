@@ -4,8 +4,14 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.assertIsDisplayed
@@ -17,14 +23,21 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.AppTimerRuleEntity
 import com.example.data.DiscoveredDeviceApp
+import com.example.data.FocusExceptionAppEntity
 import com.example.data.PinnedFocusAppEntity
 import com.example.service.BootReceiver
 import com.example.service.ChapterLockEnforcer
 import com.example.service.InterceptReason
 import com.example.ui.components.FrictionShieldOverlay
+import com.example.ui.components.SelectFocusAppBottomSheet
+import com.example.ui.components.SelectFocusAppSheetContent
+import com.example.ui.components.SystemPermissionsBottomSheet
+import com.example.ui.components.SystemPermissionsSheetContent
 import com.example.ui.screens.AppVaultScreen
+import com.example.ui.screens.ExpressiveSettingsScreen
 import com.example.ui.screens.ReadAndLockScreen
 import com.example.ui.theme.MyApplicationTheme
+import com.example.updater.UpdateState
 import com.example.viewmodel.ActiveFocusSessionState
 import com.example.viewmodel.AppTab
 import com.example.viewmodel.ChallengeMode
@@ -613,6 +626,261 @@ class ExampleRobolectricTest {
         composeTestRule.mainClock.advanceTimeBy(1000L)
         composeTestRule.onNodeWithTag("slot_machine_clock_display").assertIsDisplayed()
         saveScreenshot("portrait_tablet_focus_lock.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `capture real screenshot of Friction Math Challenge mode`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val mathChallenge = FrictionChallengeState(
+            reason = FrictionReason.QUIT_FOCUS_LOCK_EARLY,
+            targetAppName = "YouTube Lectures",
+            targetPackageName = "com.google.android.youtube",
+            mode = ChallengeMode.MATH_CHAIN,
+            patternSequence = listOf(2, 5, 10, 13, 7),
+            userClickedSequence = listOf(2, 5),
+            mathSteps = listOf(
+                MathStepProblem(1, 3, "(18 × 6) + 27", 135),
+                MathStepProblem(2, 3, "(112 − 44) × 3", 204),
+                MathStepProblem(3, 3, "(24 × 7) − 39", 129)
+            ),
+            currentMathStepIndex = 0,
+            mathInput = "13",
+            mathErrorMessage = null
+        )
+
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                Box(modifier = Modifier.size(width = 411.dp, height = 840.dp)) {
+                    FrictionShieldOverlay(
+                        challenge = mathChallenge,
+                        onSwitchMode = {},
+                        onTapMemoryTile = {},
+                        onReplayMemoryPattern = {},
+                        onPhraseChanged = {},
+                        onConfirmPhraseUnlock = {},
+                        onMathInputChanged = {},
+                        onSubmitMathStep = {},
+                        onKeepLocked = {}
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(1000L)
+        saveScreenshot("friction_math_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `capture real screenshot of System Permissions sheet`() {
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 411.dp, height = 840.dp)
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        SystemPermissionsSheetContent(
+                            hasUsageAccess = true,
+                            hasAccessibility = false,
+                            hasOverlay = true,
+                            hasNotifications = true,
+                            isBatteryOptimizedExempt = false,
+                            isXiaomi = true,
+                            onDismiss = {},
+                            onOpenUsageAccess = {},
+                            onOpenAccessibility = {},
+                            onOpenOverlay = {},
+                            onOpenAppDetailsSettings = {},
+                            onOpenNotifications = {},
+                            onOpenBatteryOptimization = {},
+                            onOpenXiaomiAutostart = {}
+                        )
+                    }
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(1000L)
+        saveScreenshot("permissions_sheet_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `capture real screenshot of Select Focus App sheet`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val pinned = listOf(
+            PinnedFocusAppEntity("com.google.android.youtube", "YouTube Lectures", "Video & Lectures", true, 185, true),
+            PinnedFocusAppEntity("com.duolingo", "Duolingo", "Education & Learning", false, 60, true),
+            PinnedFocusAppEntity("com.termux", "Termux", "Developer & Tools", false, 120, true),
+            PinnedFocusAppEntity("md.obsidian", "Obsidian", "Productivity & Notes", false, 90, true)
+        )
+        val discovered = listOf(
+            DiscoveredDeviceApp("org.coursera.android", "Coursera", "Education & Learning", true, true, 45),
+            DiscoveredDeviceApp("com.anki", "AnkiDroid", "Education & Learning", true, true, 20),
+            DiscoveredDeviceApp("com.google.android.apps.docs.editors.docs", "Google Docs", "Productivity & Tools", true, true, 35)
+        )
+
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 411.dp, height = 840.dp)
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        SelectFocusAppSheetContent(
+                            pinnedFocusApps = pinned,
+                            discoveredApps = discovered,
+                            onDismiss = {},
+                            onSelectFocusApp = {},
+                            onAddCustomFocusApp = { _, _, _ -> }
+                        )
+                    }
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(1000L)
+        saveScreenshot("select_focus_app_sheet.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-xxhdpi")
+    fun `capture real screenshot of Phone in Landscape Focus Lock`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val pinnedFocusApp = PinnedFocusAppEntity(
+            packageName = "com.google.android.youtube",
+            appName = "YouTube Lectures",
+            subtitle = "Study & Focus App",
+            isSelected = true,
+            totalFocusedMinutes = 185,
+            isInstalled = true
+        )
+        val activeSession = ActiveFocusSessionState(
+            isActive = true,
+            pinnedAppName = "YouTube Lectures",
+            pinnedPackageName = "com.google.android.youtube",
+            selectedDurationMinutes = 45,
+            totalSeconds = 2700,
+            remainingSeconds = 2142
+        )
+
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                Box(modifier = Modifier.size(width = 891.dp, height = 411.dp)) {
+                    ReadAndLockScreen(
+                        selectedFocusApp = pinnedFocusApp,
+                        activeSession = activeSession,
+                        isTablet = false,
+                        onSelectDuration = {},
+                        onStartFocusLock = {},
+                        onLaunchPinnedApp = {},
+                        onRequestQuitFocusEarly = {},
+                        onOpenSelectFocusAppSheet = {}
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(1000L)
+        saveScreenshot("phone_landscape_focus_lock.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-xxhdpi")
+    fun `capture real screenshot of Phone in Landscape App Limits`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val sampleRules = listOf(
+            AppTimerRuleEntity(
+                packageName = "com.google.android.youtube",
+                appName = "YouTube",
+                category = "Video",
+                dailyLimitMinutes = 45,
+                usedMinutesToday = 45
+            ),
+            AppTimerRuleEntity(
+                packageName = "com.instagram.android",
+                appName = "Instagram",
+                category = "Social",
+                dailyLimitMinutes = 60,
+                usedMinutesToday = 32
+            )
+        )
+
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                Box(modifier = Modifier.size(width = 891.dp, height = 411.dp)) {
+                    AppVaultScreen(
+                        appRules = sampleRules,
+                        isFocusSessionActive = false,
+                        hasUsageStatsPermission = true,
+                        hasAccessibilityPermission = true,
+                        hasOverlayPermission = true,
+                        isTablet = false,
+                        onOpenUsageAccessSettings = {},
+                        onOpenAccessibilitySettings = {},
+                        onOpenPermissionsSheet = {},
+                        onTapAppRule = {},
+                        onRequestUnlockApp = {},
+                        onOpenAddAppSheet = {}
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(1000L)
+        saveScreenshot("phone_landscape_app_limits.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `capture real screenshot of Settings screen`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val exceptions = listOf(
+            FocusExceptionAppEntity("com.google.android.dialer", "Phone & Emergency", "Emergency"),
+            FocusExceptionAppEntity("com.google.android.apps.nbu.paisa.user", "Google Pay", "Payments")
+        )
+
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = true, dynamicColor = false) {
+                Box(modifier = Modifier.size(width = 411.dp, height = 840.dp)) {
+                    ExpressiveSettingsScreen(
+                        hasUsageStatsPermission = true,
+                        hasAccessibilityPermission = true,
+                        hasOverlayPermission = true,
+                        hasNotificationPermission = true,
+                        isBatteryOptimizedExempt = true,
+                        isXiaomiDevice = false,
+                        focusExceptionApps = exceptions,
+                        selectedDurationMinutes = 45,
+                        updateState = UpdateState.Idle,
+                        isTablet = false,
+                        onNavigateBackToHome = {},
+                        onOpenUsageAccessSettings = {},
+                        onOpenAccessibilitySettings = {},
+                        onOpenOverlaySettings = {},
+                        onOpenAppDetailsSettings = {},
+                        onOpenNotificationSettings = {},
+                        onOpenBatteryOptimizationSettings = {},
+                        onOpenXiaomiAutostartSettings = null,
+                        onOpenExceptionsSheet = {},
+                        onSelectDurationMinutes = {},
+                        onCheckForUpdates = {}
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(1000L)
+        saveScreenshot("settings_screen_phone.png")
     }
 
     private fun saveScreenshot(fileName: String) {
