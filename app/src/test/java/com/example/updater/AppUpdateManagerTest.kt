@@ -126,7 +126,7 @@ class AppUpdateManagerTest {
             }
         """.trimIndent())
 
-        updateManager.parseReleaseJson(releaseJson, localInstallTimeOverrideMs = 1000L)
+        updateManager.parseReleaseJson(releaseJson, localInstallTimeOverrideMs = 1000L, currentVersionOverride = "1.2.0")
 
         val state = updateManager.updateState.value
         assertTrue("State should be UpdateAvailable for rebuild", state is UpdateState.UpdateAvailable)
@@ -163,13 +163,13 @@ class AppUpdateManagerTest {
 
         // Without forceUpdate, installed time is newer (e.g. 2026) -> UpToDate
         val nowMs = AppUpdateManager.parseIso8601ToEpochMs("2026-10-22T21:00:00Z")
-        updateManager.parseReleaseJson(releaseJson, forceUpdate = false, localInstallTimeOverrideMs = nowMs)
+        updateManager.parseReleaseJson(releaseJson, forceUpdate = false, localInstallTimeOverrideMs = nowMs, currentVersionOverride = "1.2.0")
         val upToDateState = updateManager.updateState.value
         assertTrue("State should be UpToDate", upToDateState is UpdateState.UpToDate)
         assertNotNull((upToDateState as UpdateState.UpToDate).latestRelease)
 
         // With forceUpdate = true -> UpdateAvailable
-        updateManager.parseReleaseJson(releaseJson, forceUpdate = true, localInstallTimeOverrideMs = nowMs)
+        updateManager.parseReleaseJson(releaseJson, forceUpdate = true, localInstallTimeOverrideMs = nowMs, currentVersionOverride = "1.2.0")
         val forcedState = updateManager.updateState.value
         assertTrue("State should be UpdateAvailable with forceUpdate", forcedState is UpdateState.UpdateAvailable)
     }
@@ -198,7 +198,7 @@ class AppUpdateManagerTest {
         """.trimIndent())
 
         val nowMs = AppUpdateManager.parseIso8601ToEpochMs("2026-10-22T21:00:00Z")
-        updateManager.parseReleaseJson(releaseJson, forceUpdate = false, localInstallTimeOverrideMs = nowMs, silent = true)
+        updateManager.parseReleaseJson(releaseJson, forceUpdate = false, localInstallTimeOverrideMs = nowMs, silent = true, currentVersionOverride = "1.2.0")
         val state = updateManager.updateState.value
         assertTrue("Silent check on up-to-date must leave state Idle", state is UpdateState.Idle)
     }
@@ -226,7 +226,7 @@ class AppUpdateManagerTest {
             }
         """.trimIndent())
 
-        updateManager.parseReleaseJson(releaseJson, localInstallTimeOverrideMs = 1000L, silent = true)
+        updateManager.parseReleaseJson(releaseJson, localInstallTimeOverrideMs = 1000L, silent = true, currentVersionOverride = "1.2.0")
         val state = updateManager.updateState.value
         assertTrue("Silent check on rebuild must set UpdateAvailable", state is UpdateState.UpdateAvailable)
     }

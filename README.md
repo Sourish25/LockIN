@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Sourish25/LockIN/releases/tag/v1.2.0"><img src="https://img.shields.io/badge/Release-v1.2.0-6750A4?style=flat-square" alt="Version 1.2.0" /></a>
+  <a href="https://github.com/Sourish25/LockIN/releases/tag/v1.3.0"><img src="https://img.shields.io/badge/Release-v1.3.0-6750A4?style=flat-square" alt="Version 1.3.0" /></a>
   <img src="https://img.shields.io/badge/Architecture-Material%20You%20Expressive-7F52FF?style=flat-square" alt="Material You Expressive" />
   <img src="https://img.shields.io/badge/Platform-Android%2010%20to%2016%20(API%2029--36)-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform" />
   <img src="https://img.shields.io/badge/Privacy-100%25%20On--Device%20%7C%20Zero%20Telemetry-10B981?style=flat-square" alt="Zero Telemetry" />
@@ -227,13 +227,13 @@ Signed, multi-ABI production APK binaries are compiled and published directly vi
 
 | Architecture | Package Asset | Target Hardware | SHA-256 Digest |
 | :--- | :--- | :--- | :--- |
-| **ARM64 (64-bit)** | [LockIN-v1.2.0-arm64-v8a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-arm64-v8a.apk) | Modern Android phones & tablets (2018 to Present) | `8e8e50c1c90494bb95fa67008f42252539857737a9a5d90c10f97edc0a9d9f84` |
-| **ARMv7 (32-bit)** | [LockIN-v1.2.0-armeabi-v7a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-armeabi-v7a.apk) | Legacy 32-bit Android phones and budget hardware | `eea261360257c728422e7a7abd29c168c4ae783d69ccb8c311d601c1fdc4fc18` |
-| **Universal** | [LockIN-v1.2.0-universal.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-universal.apk) | Single package supporting all CPU architectures | `0deadc806a1524f8aef532174cd8ea3694cc3318cd84be00f5d822fc68578688` |
-| **x86_64** | [LockIN-v1.2.0-x86_64.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-x86_64.apk) | Modern desktop Android emulators, ChromeOS & 64-bit PCs | `6e27253fa509e464d660da788186f9b8339cb2502115f747aed9d03026da46f5` |
-| **x86** | [LockIN-v1.2.0-x86.apk](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/LockIN-v1.2.0-x86.apk) | 32-bit development emulators | `6b5977c9c1c98815960f83d23abac059915203e987391a2c0f3e2730919a1aea` |
+| **ARM64 (64-bit)** | [LockIN-v1.3.0-arm64-v8a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-arm64-v8a.apk) | Modern Android phones & tablets (2018 to Present) | `379e48dfd2692e31a0b57fe33a425f8d61cef348d7c1572de4bc5fb1cdf04291` |
+| **ARMv7 (32-bit)** | [LockIN-v1.3.0-armeabi-v7a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-armeabi-v7a.apk) | Legacy 32-bit Android phones and budget hardware | `fdac04c52c606f3c6864a86f68102261169f0665564bc4d0cf1163cd03a53ea9` |
+| **Universal** | [LockIN-v1.3.0-universal.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-universal.apk) | Single package supporting all CPU architectures | `d1bad451190e56de1305c3939bcee511c1033d3ca3fca105c7d83051a0452b60` |
+| **x86_64** | [LockIN-v1.3.0-x86_64.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-x86_64.apk) | Modern desktop Android emulators, ChromeOS & 64-bit PCs | `815cb6b0c872e005a342750b39c8a00f7d878e4a489608e16b050bf00eff0f6f` |
+| **x86** | [LockIN-v1.3.0-x86.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-x86.apk) | 32-bit development emulators | `dbc0dc9fd8c58c9f50e69037ee961a302e7e4634a7afdf75512e2cd1a90a811b` |
 
-Every release includes an official [SHA256SUMS.txt](https://github.com/Sourish25/LockIN/releases/download/v1.2.0/SHA256SUMS.txt) manifest to cryptographically verify archive authenticity prior to installation.
+Every release includes an official [SHA256SUMS.txt](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/SHA256SUMS.txt) manifest to cryptographically verify archive authenticity prior to installation.
 
 ---
 

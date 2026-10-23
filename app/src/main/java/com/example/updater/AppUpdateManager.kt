@@ -332,11 +332,12 @@ class AppUpdateManager(private val context: Context) {
         releaseObj: JSONObject,
         forceUpdate: Boolean = false,
         localInstallTimeOverrideMs: Long? = null,
-        silent: Boolean = false
+        silent: Boolean = false,
+        currentVersionOverride: String? = null
     ) {
         val tagName = releaseObj.optString("tag_name", "")
         val remoteVersion = tagName.trimStart('v')
-        val currentVersion = BuildConfig.VERSION_NAME
+        val currentVersion = currentVersionOverride ?: BuildConfig.VERSION_NAME
 
         val assetsJson = releaseObj.optJSONArray("assets") ?: JSONArray()
         val assetsList = (0 until assetsJson.length()).map { assetsJson.getJSONObject(it) }
