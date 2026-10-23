@@ -81,7 +81,7 @@ class ExampleRobolectricTest {
             category = "Social",
             dailyLimitMinutes = 60,
             usedMinutesToday = 45,
-            blockDuringReading = true
+            blockDuringFocus = true
         )
         assertFalse(ruleUnderBudget.isCurrentlyBlocked(isFocusSessionActive = false))
         assertTrue(ruleUnderBudget.isCurrentlyBlocked(isFocusSessionActive = true))
@@ -98,7 +98,7 @@ class ExampleRobolectricTest {
             category = "Video",
             dailyLimitMinutes = 30,
             usedMinutesToday = 35,
-            blockDuringReading = true
+            blockDuringFocus = true
         )
         ChapterLockEnforcer.syncRules(listOf(youtubeRule))
         ChapterLockEnforcer.updateFocusLockState(
@@ -137,22 +137,22 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `focus lock mode intercepts unauthorized apps while keeping reader open`() {
-        val readerPkg = "com.flyersoft.moonreader"
+    fun `focus lock mode intercepts unauthorized apps while keeping pinned focus app open`() {
+        val pinnedAppPkg = "com.google.android.youtube"
         val now = System.currentTimeMillis()
         ChapterLockEnforcer.updateFocusLockState(
             active = true,
-            pinnedPackage = readerPkg,
-            pinnedName = "Moon+ Reader",
+            pinnedPackage = pinnedAppPkg,
+            pinnedName = "YouTube Lectures",
             endTimeMs = now + 1_800_000L
         )
 
-        val readerDecision = ChapterLockEnforcer.evaluatePackage(readerPkg, "com.example")
-        assertNull("Pinned reader must be permitted during focus lock", readerDecision)
+        val pinnedDecision = ChapterLockEnforcer.evaluatePackage(pinnedAppPkg, "com.example")
+        assertNull("Pinned focus app must be permitted during focus lock", pinnedDecision)
 
-        val youtubeDecision = ChapterLockEnforcer.evaluatePackage("com.google.android.youtube", "com.example")
-        assertNotNull(youtubeDecision)
-        assertEquals(InterceptReason.FOCUS_LOCK_BREACH, youtubeDecision?.reason)
+        val unauthorizedDecision = ChapterLockEnforcer.evaluatePackage("com.instagram.android", "com.example")
+        assertNotNull(unauthorizedDecision)
+        assertEquals(InterceptReason.FOCUS_LOCK_BREACH, unauthorizedDecision?.reason)
 
         // System launcher must trigger FOCUS_LOCK_LAUNCHER_BREACH when Focus Lock is active to confine navigation
         val launcherDecision = ChapterLockEnforcer.evaluatePackage("com.miui.home", "com.example")
@@ -245,8 +245,8 @@ class ExampleRobolectricTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         ChapterLockEnforcer.updateFocusLockState(
             active = true,
-            pinnedPackage = "com.flyersoft.moonreader",
-            pinnedName = "Moon+ Reader",
+            pinnedPackage = "com.google.android.youtube",
+            pinnedName = "YouTube Lectures",
             endTimeMs = System.currentTimeMillis() + 30 * 60_000L
         )
         val focusNotif = com.example.service.LockNotificationManager.buildForegroundServiceNotification(context)
@@ -271,8 +271,8 @@ class ExampleRobolectricTest {
                 AppVaultScreen(
                     appRules = emptyList(),
                     isFocusSessionActive = true,
-                    activeFocusAppName = "Moon+ Reader",
-                    activeFocusPackageName = "com.flyersoft.moonreader",
+                    activeFocusAppName = "YouTube Lectures",
+                    activeFocusPackageName = "com.google.android.youtube",
                     activeFocusCountdown = "42:15",
                     hasUsageStatsPermission = true,
                     hasAccessibilityPermission = true,
@@ -349,18 +349,18 @@ class ExampleRobolectricTest {
     @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun `capture real screenshot of FocusLock screen`() {
         composeTestRule.mainClock.autoAdvance = false
-        val readerApp = PinnedFocusAppEntity(
-            packageName = "com.flyersoft.moonreader",
-            appName = "Moon+ Reader",
-            subtitle = "Installed Reader",
+        val pinnedFocusApp = PinnedFocusAppEntity(
+            packageName = "com.google.android.youtube",
+            appName = "YouTube Lectures",
+            subtitle = "Study & Focus App",
             isSelected = true,
             totalFocusedMinutes = 185,
             isInstalled = true
         )
         val activeSession = ActiveFocusSessionState(
             isActive = true,
-            pinnedAppName = "Moon+ Reader",
-            pinnedPackageName = "com.flyersoft.moonreader",
+            pinnedAppName = "YouTube Lectures",
+            pinnedPackageName = "com.google.android.youtube",
             selectedDurationMinutes = 45,
             totalSeconds = 2700,
             remainingSeconds = 2142
@@ -370,7 +370,7 @@ class ExampleRobolectricTest {
             MyApplicationTheme(darkTheme = true, dynamicColor = false) {
                 Box(modifier = Modifier.size(width = 411.dp, height = 840.dp)) {
                     ReadAndLockScreen(
-                        selectedFocusApp = readerApp,
+                        selectedFocusApp = pinnedFocusApp,
                         activeSession = activeSession,
                         isTablet = false,
                         onSelectDuration = {},
@@ -392,8 +392,8 @@ class ExampleRobolectricTest {
         composeTestRule.mainClock.autoAdvance = false
         val challenge = FrictionChallengeState(
             reason = FrictionReason.QUIT_FOCUS_LOCK_EARLY,
-            targetAppName = "Moon+ Reader",
-            targetPackageName = "com.flyersoft.moonreader",
+            targetAppName = "YouTube Lectures",
+            targetPackageName = "com.google.android.youtube",
             mode = ChallengeMode.MEMORY_GRID,
             patternSequence = listOf(2, 5, 10, 13, 7),
             userClickedSequence = listOf(2, 5),
@@ -428,18 +428,18 @@ class ExampleRobolectricTest {
     @Config(qualifiers = "w960dp-h640dp-xhdpi")
     fun `capture real screenshot of Tablet 3 to 2 layout`() {
         composeTestRule.mainClock.autoAdvance = false
-        val readerApp = PinnedFocusAppEntity(
-            packageName = "com.flyersoft.moonreader",
-            appName = "Moon+ Reader",
-            subtitle = "Installed Reader",
+        val pinnedFocusApp = PinnedFocusAppEntity(
+            packageName = "com.google.android.youtube",
+            appName = "YouTube Lectures",
+            subtitle = "Study & Focus App",
             isSelected = true,
             totalFocusedMinutes = 240,
             isInstalled = true
         )
         val session = ActiveFocusSessionState(
             isActive = false,
-            pinnedAppName = "Moon+ Reader",
-            pinnedPackageName = "com.flyersoft.moonreader",
+            pinnedAppName = "YouTube Lectures",
+            pinnedPackageName = "com.google.android.youtube",
             selectedDurationMinutes = 60,
             totalSeconds = 3600,
             remainingSeconds = 3600
@@ -466,7 +466,7 @@ class ExampleRobolectricTest {
                                 onToggleWallpaperTheme = {}
                             )
                             ReadAndLockScreen(
-                                selectedFocusApp = readerApp,
+                                selectedFocusApp = pinnedFocusApp,
                                 activeSession = session,
                                 focusHistoryCount = 6,
                                 isTablet = true,
@@ -576,18 +576,18 @@ class ExampleRobolectricTest {
     @Config(qualifiers = "w768dp-h1024dp-xhdpi")
     fun `portrait tablet uses centered single-column layout and slot-machine clock displays real-time seconds`() {
         composeTestRule.mainClock.autoAdvance = false
-        val readerApp = PinnedFocusAppEntity(
-            packageName = "com.flyersoft.moonreader",
-            appName = "Moon+ Reader",
-            subtitle = "Installed Reader",
+        val pinnedFocusApp = PinnedFocusAppEntity(
+            packageName = "com.google.android.youtube",
+            appName = "YouTube Lectures",
+            subtitle = "Study & Focus App",
             isSelected = true,
             totalFocusedMinutes = 185,
             isInstalled = true
         )
         val idleSession = ActiveFocusSessionState(
             isActive = false,
-            pinnedAppName = "Moon+ Reader",
-            pinnedPackageName = "com.flyersoft.moonreader",
+            pinnedAppName = "YouTube Lectures",
+            pinnedPackageName = "com.google.android.youtube",
             selectedDurationMinutes = 90,
             totalSeconds = 5400,
             remainingSeconds = 5400
@@ -597,7 +597,7 @@ class ExampleRobolectricTest {
             MyApplicationTheme(darkTheme = true, dynamicColor = false) {
                 Box(modifier = Modifier.size(width = 768.dp, height = 1024.dp)) {
                     ReadAndLockScreen(
-                        selectedFocusApp = readerApp,
+                        selectedFocusApp = pinnedFocusApp,
                         activeSession = idleSession,
                         focusHistoryCount = 4,
                         isTablet = false,

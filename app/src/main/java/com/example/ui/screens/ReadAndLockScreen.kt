@@ -623,7 +623,7 @@ fun FocusLockScreen(
                                         ExpressiveFeedbackEngine.playLockActivated(context)
                                         onStartFocusLock()
                                     }
-                                    .testTag("start_reading_lockdown_button")
+                                    .testTag("start_focus_lockdown_button")
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -995,7 +995,7 @@ fun FocusLockScreen(
                                             ExpressiveFeedbackEngine.playLockActivated(context)
                                             onStartFocusLock()
                                         }
-                                        .testTag("start_reading_lockdown_button")
+                                        .testTag("start_focus_lockdown_button")
                                 ) {
                                     Row(
                                         modifier = Modifier

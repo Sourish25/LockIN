@@ -306,7 +306,6 @@ object ChapterLockEnforcer {
     fun getActiveFocusAppName(): String = pinnedFocusAppName.get()
     fun getPinnedAppPackage(): String? = pinnedFocusPackage.get()
     fun getPinnedFocusPackage(): String = pinnedFocusPackage.get().orEmpty()
-    fun getWhitelistedReaderPackage(): String = getPinnedFocusPackage()
     fun getCachedRulesSnapshot(): List<AppTimerRuleEntity> = appRulesMap.values.toList()
 
     fun updateFocusSessionState(

@@ -20,9 +20,12 @@ data class DiscoveredDeviceApp(
     val appName: String,
     val category: String,
     val isInstalledOnDevice: Boolean = true,
-    val isReaderApp: Boolean = false,
+    val isFocusCandidateApp: Boolean = false,
     val usedMinutesToday: Int = 0
-)
+) {
+    val isReaderApp: Boolean
+        get() = isFocusCandidateApp
+}
 
 class SystemAppInspector(val context: Context) {
 
@@ -360,7 +363,7 @@ class SystemAppInspector(val context: Context) {
                 return it
             }
 
-            // 2. Extended check over the last 2 hours (catches long YouTube / reading sessions)
+            // 2. Extended check over the last 2 hours (catches long lecture, study, or deep focus sessions)
             findLatestForegroundFromEvents(usageStatsManager, now - 7_200_000L, now)?.let {
                 return it
             }
@@ -423,7 +426,7 @@ class SystemAppInspector(val context: Context) {
                     appName = label,
                     category = categorizePackage(pkg, label),
                     isInstalledOnDevice = true,
-                    isReaderApp = isKnownReaderApp(pkg, label),
+                    isFocusCandidateApp = isKnownFocusCandidateApp(pkg, label),
                     usedMinutesToday = usageMap[pkg] ?: 0
                 )
             }
@@ -444,7 +447,7 @@ class SystemAppInspector(val context: Context) {
                         appName = label,
                         category = categorizePackage(pkg, label),
                         isInstalledOnDevice = true,
-                        isReaderApp = isKnownReaderApp(pkg, label),
+                        isFocusCandidateApp = isKnownFocusCandidateApp(pkg, label),
                         usedMinutesToday = usageMap[pkg] ?: 0
                     )
                 }
@@ -458,14 +461,18 @@ class SystemAppInspector(val context: Context) {
         )
     }
 
-    private fun isKnownReaderApp(packageName: String, label: String): Boolean {
+    private fun isKnownFocusCandidateApp(packageName: String, label: String): Boolean {
         val lower = "${packageName.lowercase()} ${label.lowercase()}"
         return "reader" in lower || "novel" in lower || "book" in lower ||
                 "kindle" in lower || "mihon" in lower || "tachiyomi" in lower ||
                 "readera" in lower || "kobo" in lower || "webnovel" in lower ||
                 "epub" in lower || "manga" in lower || "aniyomi" in lower ||
                 "kotatsu" in lower || "lnreader" in lower || "shosetsu" in lower ||
-                "librera" in lower || "fbreader" in lower || "lithium" in lower
+                "librera" in lower || "fbreader" in lower || "lithium" in lower ||
+                "youtube" in lower || "coursera" in lower || "udemy" in lower ||
+                "khan" in lower || "edx" in lower || "duolingo" in lower ||
+                "anki" in lower || "quizlet" in lower || "notion" in lower ||
+                "obsidian" in lower || "termux" in lower || "docs" in lower
     }
 
     fun isEssentialUtilityApp(packageName: String, label: String): Boolean {
@@ -484,7 +491,7 @@ class SystemAppInspector(val context: Context) {
             "dialer" in lower || "phone" in lower || "contacts" in lower || "emergency" in lower || "messages" in lower || "mms" in lower || "authenticator" in lower -> "Emergency & Calls"
             "duolingo" in lower || "anki" in lower || "khan" in lower || "coursera" in lower || "udemy" in lower || "quizlet" in lower || "edx" in lower || "brilliant" in lower || "learn" in lower || "study" in lower -> "Education & Learning"
             "notion" in lower || "obsidian" in lower || "evernote" in lower || "onenote" in lower || "docs" in lower || "sheets" in lower || "tasks" in lower || "todoist" in lower || "ticktick" in lower || "termux" in lower || "keep" in lower -> "Productivity & Tools"
-            "reader" in lower || "novel" in lower || "book" in lower || "kindle" in lower || "mihon" in lower || "tachiyomi" in lower || "readera" in lower || "kobo" in lower || "webnovel" in lower || "epub" in lower || "manga" in lower || "aniyomi" in lower || "kotatsu" in lower || "lnreader" in lower || "shosetsu" in lower || "librera" in lower || "fbreader" in lower || "lithium" in lower -> "Reading & Books"
+            "reader" in lower || "novel" in lower || "book" in lower || "kindle" in lower || "mihon" in lower || "tachiyomi" in lower || "readera" in lower || "kobo" in lower || "webnovel" in lower || "epub" in lower || "manga" in lower || "aniyomi" in lower || "kotatsu" in lower || "lnreader" in lower || "shosetsu" in lower || "librera" in lower || "fbreader" in lower || "lithium" in lower -> "Reading & Reference"
             "youtube" in lower || "netflix" in lower || "video" in lower || "twitch" in lower || "bilibili" in lower || "prime" in lower || "disney" in lower || "hotstar" in lower -> "Video & Streaming"
             "instagram" in lower || "twitter" in lower || "facebook" in lower || "threads" in lower || "discord" in lower || "whatsapp" in lower || "telegram" in lower || "snapchat" in lower -> "Social & Messaging"
             "tiktok" in lower || "musical" in lower || "reel" in lower || "shorts" in lower -> "Short Video"

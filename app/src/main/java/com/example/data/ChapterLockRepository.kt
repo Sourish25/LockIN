@@ -239,7 +239,7 @@ class ChapterLockRepository(
             category = category,
             dailyLimitMinutes = dailyLimitMinutes.coerceIn(1, 360),
             usedMinutesToday = usedToday,
-            blockDuringReading = true
+            blockDuringFocus = true
         )
         dao.upsertAppRule(rule)
         syncEnforcerState()

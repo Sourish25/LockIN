@@ -278,7 +278,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                 MediaPlaybackSuppressor.suppressPlayback(this, pkg)
 
                 // 2. Force close PiP window if running in Picture-in-Picture mode
-                if (isPip && rootNode != null) {
+                if (isPip) {
                     dismissPipWindow(rootNode)
                 }
 
@@ -316,10 +316,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             if (findAndClickDismissButton(child)) {
-                child.recycle()
                 return true
             }
-            child.recycle()
         }
         return false
     }

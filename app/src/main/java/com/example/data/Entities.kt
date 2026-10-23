@@ -1,5 +1,6 @@
 package com.example.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -10,7 +11,8 @@ data class AppTimerRuleEntity(
     val category: String,
     val dailyLimitMinutes: Int,
     val usedMinutesToday: Int,
-    val blockDuringReading: Boolean = true,
+    @ColumnInfo(name = "block_during_reading", defaultValue = "1")
+    val blockDuringFocus: Boolean = true,
     val unlockedUntilEpochMs: Long = 0L,
     val lastUpdatedDayEpoch: Long = currentEpochDay()
 ) {
@@ -28,8 +30,8 @@ data class AppTimerRuleEntity(
             (usedMinutesToday.toFloat() / dailyLimitMinutes.toFloat()).coerceIn(0f, 1f)
         } else 0f
 
-    val blockDuringFocus: Boolean
-        get() = blockDuringReading
+    val blockDuringReading: Boolean
+        get() = blockDuringFocus
 
     fun isTemporarilyUnlocked(nowMs: Long = System.currentTimeMillis()): Boolean {
         return unlockedUntilEpochMs > nowMs
@@ -37,7 +39,7 @@ data class AppTimerRuleEntity(
 
     fun isCurrentlyBlocked(isFocusSessionActive: Boolean, nowMs: Long = System.currentTimeMillis()): Boolean {
         if (isTemporarilyUnlocked(nowMs)) return false
-        if (isFocusSessionActive && blockDuringReading) return true
+        if (isFocusSessionActive && blockDuringFocus) return true
         if (isOverDailyBudget) return true
         return false
     }
