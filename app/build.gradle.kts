@@ -12,8 +12,8 @@ android {
     applicationId = "com.sourish.lockin"
     minSdk = 24
     targetSdk = 36
-    versionCode = 3
-    versionName = "1.3.0"
+    versionCode = 1
+    versionName = "1.0.0"
 
     buildConfigField("long", "BUILD_TIME_MILLIS", "${System.currentTimeMillis()}L")
 

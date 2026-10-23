@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Sourish25/LockIN/releases/tag/v1.3.0"><img src="https://img.shields.io/badge/Release-v1.3.0-6750A4?style=flat-square" alt="Version 1.3.0" /></a>
+  <a href="https://github.com/Sourish25/LockIN/releases/tag/v1.0.0"><img src="https://img.shields.io/badge/Release-v1.0.0-6750A4?style=flat-square" alt="Version 1.0.0" /></a>
   <img src="https://img.shields.io/badge/Architecture-Material%20You%20Expressive-7F52FF?style=flat-square" alt="Material You Expressive" />
   <img src="https://img.shields.io/badge/Platform-Android%2010%20to%2016%20(API%2029--36)-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform" />
   <img src="https://img.shields.io/badge/Privacy-100%25%20On--Device%20%7C%20Zero%20Telemetry-10B981?style=flat-square" alt="Zero Telemetry" />
@@ -116,35 +116,48 @@ LockIN is built upon Google's Material You Expressive design language. Instead o
 
 ## Visual Interface
 
-### Mobile Smartphone Experience (Portrait)
+Designed from the ground up around Google's Material You Expressive design language, LockIN transforms focus management into a tactile, calming, and visually engaging experience across phones, foldables, and tablets.
 
-| Daily App Vault | Focus Chamber | Expressive Settings |
+### Primary Smartphone Canvas (Portrait)
+
+| The App Vault | The Focus Chamber | Expressive Settings |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/app_limits_phone.png" width="250" alt="Daily App Limits Screen" /> | <img src="docs/screenshots/focus_lock_phone.png" width="250" alt="Focus Lock Screen" /> | <img src="docs/screenshots/settings_screen_phone.png" width="250" alt="Expressive Settings Screen" /> |
+| <img src="docs/screenshots/app_limits_phone.png" width="260" alt="Daily App Limits Screen" /> | <img src="docs/screenshots/focus_lock_phone.png" width="260" alt="Focus Lock Screen" /> | <img src="docs/screenshots/settings_screen_phone.png" width="260" alt="Expressive Settings Screen" /> |
+| **Daily App Budgets**<br>Set strict daily time caps on social media, video feeds, and games. When your allowance runs out, the app is locked until midnight. | **Single-App Immersion**<br>Choose the app you want to study or work in, spin the slot-machine odometer to set your timer, and lock yourself inside with zero distractions. | **Protection & Exceptions**<br>Whitelist vital everyday tools like Phone calls, Google Pay, and emergency apps so you are never cut off from real-life necessities. |
 
 ### Cognitive Friction Challenges (Breaking Subconscious Muscle Memory)
 
-| 4x4 Spatial Pattern Memory | 3-Step Mental Arithmetic Chain |
+When you feel an impulsive urge to quit early, LockIN presents high-engagement working-memory challenges instead of static PIN codes, waking up your prefrontal cortex before subconscious autopilot takes over.
+
+| 4x4 Visuospatial Memory Grid | 3-Step Mental Arithmetic Chain |
 | :---: | :---: |
-| <img src="docs/screenshots/friction_puzzle_phone.png" width="320" alt="Cognitive Friction Memory Grid" /> | <img src="docs/screenshots/friction_math_phone.png" width="320" alt="Cognitive Friction Math Challenge" /> |
+| <img src="docs/screenshots/friction_puzzle_phone.png" width="340" alt="Cognitive Friction Memory Grid" /> | <img src="docs/screenshots/friction_math_phone.png" width="340" alt="Cognitive Friction Math Challenge" /> |
+| **Spatial Recall Challenge**<br>A high-entropy pattern flashes across the 4x4 matrix for 2.5 seconds. Reconstruct it from memory in exact order to confirm intentional exit. | **Analytical Math Chain**<br>Solve a multi-step mental arithmetic chain requiring deliberate calculation to shift brain state from autopilot into conscious decision-making. |
 
 ### Intuitive Modal Sheets & App Selection
 
 | Pinned Focus App Selector | Protection & System Permissions |
 | :---: | :---: |
-| <img src="docs/screenshots/select_focus_app_sheet.png" width="320" alt="Select Focus App Sheet" /> | <img src="docs/screenshots/permissions_sheet_phone.png" width="320" alt="Protection & Permissions Sheet" /> |
+| <img src="docs/screenshots/select_focus_app_sheet.png" width="340" alt="Select Focus App Sheet" /> | <img src="docs/screenshots/permissions_sheet_phone.png" width="340" alt="Protection & Permissions Sheet" /> |
+| **Instant Candidate Picker**<br>Quickly browse and search installed apps, complete with category tags, custom package entry, and total focused minutes tracking. | **Permission Security Center**<br>Transparent status overview showing exactly why Android Accessibility, Usage Stats, and Overlay permissions are required for offline protection. |
 
-### Phone Landscape View (Media, Gaming & Study Form-Factors)
+### Phone Landscape View (Media, Study & Terminal Form-Factors)
+
+When you turn your device sideways to watch full-screen lectures, inspect code in Termux, or read documentation, LockIN smoothly adapts to an immersive widescreen layout.
 
 | Focus Chamber (Landscape) | Daily App Vault (Landscape) |
 | :---: | :---: |
-| <img src="docs/screenshots/phone_landscape_focus_lock.png" width="420" alt="Phone Landscape Focus Lock" /> | <img src="docs/screenshots/phone_landscape_app_limits.png" width="420" alt="Phone Landscape App Limits" /> |
+| <img src="docs/screenshots/phone_landscape_focus_lock.png" width="440" alt="Phone Landscape Focus Lock" /> | <img src="docs/screenshots/phone_landscape_app_limits.png" width="440" alt="Phone Landscape App Limits" /> |
+| **Landscape Chronometer**<br>Side-by-side timer reel and focus app metadata optimized for lecture viewing and study sessions. | **Widescreen Quotas**<br>Two-column responsive card layout displaying daily usage progress and quick edit actions. |
 
 ### Adaptive Tablet & Foldable Experience (3:2 Canonical Layouts)
 
-| Portrait Tablet Focus View | Landscape 3:2 Focus Chamber | Landscape 3:2 App Quotas Vault |
+LockIN is natively designed for modern Android tablets (such as the Xiaomi Pad 7, Galaxy Tab, and Pixel Tablet) and large-screen foldables, utilizing Google's canonical Material adaptive layouts.
+
+| Portrait Tablet Canvas | Landscape 3:2 Focus Chamber | Landscape 3:2 App Quotas Vault |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/portrait_tablet_focus_lock.png" width="270" alt="Tablet Portrait Focus Lock" /> | <img src="docs/screenshots/tablet_3_2_layout.png" width="270" alt="Tablet Landscape Focus Lock" /> | <img src="docs/screenshots/tablet_app_limits_layout.png" width="270" alt="Tablet Landscape App Limits" /> |
+| <img src="docs/screenshots/portrait_tablet_focus_lock.png" width="280" alt="Tablet Portrait Focus Lock" /> | <img src="docs/screenshots/tablet_3_2_layout.png" width="280" alt="Tablet Landscape Focus Lock" /> | <img src="docs/screenshots/tablet_app_limits_layout.png" width="280" alt="Tablet Landscape App Limits" /> |
+| **Centered Single-Column**<br>Clean centered layout featuring the large-format slot-machine odometer with real-time seconds downward rolling countdown. | **Dual-Pane Master-Detail**<br>Ergonomic left-hand navigation rail paired with master-detail focus duration dials and session history. | **Split-Screen App Management**<br>Comprehensive multi-column overview of installed apps, live usage meters, and preset allowance dials. |
 
 ---
 
@@ -227,13 +240,13 @@ Signed, multi-ABI production APK binaries are compiled and published directly vi
 
 | Architecture | Package Asset | Target Hardware | SHA-256 Digest |
 | :--- | :--- | :--- | :--- |
-| **ARM64 (64-bit)** | [LockIN-v1.3.0-arm64-v8a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-arm64-v8a.apk) | Modern Android phones & tablets (2018 to Present) | `379e48dfd2692e31a0b57fe33a425f8d61cef348d7c1572de4bc5fb1cdf04291` |
-| **ARMv7 (32-bit)** | [LockIN-v1.3.0-armeabi-v7a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-armeabi-v7a.apk) | Legacy 32-bit Android phones and budget hardware | `fdac04c52c606f3c6864a86f68102261169f0665564bc4d0cf1163cd03a53ea9` |
-| **Universal** | [LockIN-v1.3.0-universal.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-universal.apk) | Single package supporting all CPU architectures | `d1bad451190e56de1305c3939bcee511c1033d3ca3fca105c7d83051a0452b60` |
-| **x86_64** | [LockIN-v1.3.0-x86_64.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-x86_64.apk) | Modern desktop Android emulators, ChromeOS & 64-bit PCs | `815cb6b0c872e005a342750b39c8a00f7d878e4a489608e16b050bf00eff0f6f` |
-| **x86** | [LockIN-v1.3.0-x86.apk](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/LockIN-v1.3.0-x86.apk) | 32-bit development emulators | `dbc0dc9fd8c58c9f50e69037ee961a302e7e4634a7afdf75512e2cd1a90a811b` |
+| **ARM64 (64-bit)** | [LockIN-v1.0.0-arm64-v8a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.0.0/LockIN-v1.0.0-arm64-v8a.apk) | Modern Android phones & tablets (2018 to Present) | `b9818f96de2da971ff822f8de2e528579fa59b4086f7bb92b979b6a7c555977a` |
+| **ARMv7 (32-bit)** | [LockIN-v1.0.0-armeabi-v7a.apk](https://github.com/Sourish25/LockIN/releases/download/v1.0.0/LockIN-v1.0.0-armeabi-v7a.apk) | Legacy 32-bit Android phones and budget hardware | `a7872ac08d35fe16cfec9e079dcc3f244b245feef98d18235b371711a9d4b77f` |
+| **Universal** | [LockIN-v1.0.0-universal.apk](https://github.com/Sourish25/LockIN/releases/download/v1.0.0/LockIN-v1.0.0-universal.apk) | Single package supporting all CPU architectures | `687fabdbc502079ee8f61c765e1a16f51c9ab40ae452e3823c8757872e4293a7` |
+| **x86_64** | [LockIN-v1.0.0-x86_64.apk](https://github.com/Sourish25/LockIN/releases/download/v1.0.0/LockIN-v1.0.0-x86_64.apk) | Modern desktop Android emulators, ChromeOS & 64-bit PCs | `1abcdc397170694c3bb5c539b34e6048cb6356f05ef236e88046b214a8b788db` |
+| **x86** | [LockIN-v1.0.0-x86.apk](https://github.com/Sourish25/LockIN/releases/download/v1.0.0/LockIN-v1.0.0-x86.apk) | 32-bit development emulators | `771dc766d78254cb5e10926ffbaa837f354134beca9fee452a0db8169107a9da` |
 
-Every release includes an official [SHA256SUMS.txt](https://github.com/Sourish25/LockIN/releases/download/v1.3.0/SHA256SUMS.txt) manifest to cryptographically verify archive authenticity prior to installation.
+Every release includes an official [SHA256SUMS.txt](https://github.com/Sourish25/LockIN/releases/download/v1.0.0/SHA256SUMS.txt) manifest to cryptographically verify archive authenticity prior to installation.
 
 ---
 
